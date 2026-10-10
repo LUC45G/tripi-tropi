@@ -28,6 +28,10 @@ Entrega completa de presentación y navegación de la sidebar, después del 04, 
 - [x] Botón de colapso ocupa todo el ancho disponible del pie y article.markdown ocupa todo el ancho del detalle.
 - [x] Mostrar Codex: nombre de sesión - ID, con ID muted y fallback cuando no haya nombre disponible.
 - [ ] Mantener el ticket abierto hasta la conformidad explícita del usuario con la UI.
+- [ ] Mostrar en cada feature el porcentaje de tickets con estado Completed en lugar del total de tickets.
+- [ ] Mostrar junto al estado de los tickets In progress el porcentaje de criterios de aceptación completados; un ticket completado muestra 100%.
+- [ ] Mostrar la ruta del repositorio en el header con una barra inicial para identificarla como directorio.
+- [ ] Mostrar solo el título de la feature en su encabezado, eliminando el contador textual que aparece junto al nombre.
 
 ## Trabajo realizado
 Marca SVG compartida con favicon, textos eliminados y cursores de resize según orientación. Botón accesible con aria-expanded para colapsar/expandir la sidebar, preferencia por repositorio y ancho conservado. Live tiene descripción de su conexión para actualizaciones automáticas. Pruebas de navegador verifican identidad, ausencia de textos, cursores, colapso, recarga y restauración de ancho; las pruebas en vivo siguen pasando.
@@ -42,9 +46,13 @@ Tercera entrega: encabezado del detalle organizado en tabla semántica de títul
 
 Cuarta entrega: botón de colapso al 100% del ancho disponible del pie y Markdown al 100% de la columna, sin máximo de 76ch. Codex muestra nombre de sesión seguido del ID muted. El servidor consulta únicamente metadatos del índice local de sesiones, de forma opcional y de solo lectura; admite líneas incompletas o un índice ausente sin afectar el visor y no cambia el destino de envío. Si no hay nombre, muestra Unnamed session. Texto insertado como contenido seguro, sin interpretar HTML. Nombre real verificado: Set up Matt Pocock skills. Verificación visual de anchos y 24 pruebas Node/Edge pasan; el 07 permanece abierto para conformidad del usuario.
 
+Quinta entrega pendiente: completar la información visual de progreso y simplificar los encabezados. El porcentaje de una feature debe contar tickets Completed sobre todos sus tickets, sin depender de los filtros activos. El porcentaje de un ticket In progress debe derivarse de sus criterios de aceptación detectados en Markdown; los tickets sin criterios muestran 0% y los completados 100%. La ruta del repositorio debe comenzar con `/` en el header y el encabezado de la feature debe conservar únicamente su título.
+
 ## Estado posterior
 Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733 y 20f4f8c58f68. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
 
 ## Comments
 
 El usuario agregó consistencia y títulos para dropdowns, cierre al hacer clic afuera, Clear filters explícito y eliminación del contador textual duplicado. Solicitó mover el control de colapso al pie y eliminar los textos de sidebar-note. Reforzó que el 07 debe permanecer abierto hasta quedar conforme con la UI. Los nuevos ajustes son una ampliación de esta entrega visual, sin depender parcialmente de otros tickets.
+
+El usuario agregó porcentajes de completitud para features y tickets en progreso, una ruta de repositorio identificable como directorio y un encabezado de feature sin contador. Estos ajustes pertenecen al 07 y no cierran el ticket hasta recibir conformidad explícita.
