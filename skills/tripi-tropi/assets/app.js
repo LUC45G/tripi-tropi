@@ -145,7 +145,7 @@ function navigateTicket(id) {
   recordCurrentScroll();
   const sameFeature = ticket.feature === selectedFeature;
   selectedFeature = ticket.feature; selectedTicket = ticket.id; mobileView = 'detail'; render();
-  if (sameFeature) requestAnimationFrame(() => document.querySelector(`[data-ticket-row="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+  if (sameFeature) requestAnimationFrame(() => document.querySelector(`[data-ticket-row="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   el('detail').scrollTop = 0; writeRoute('push');
 }
 
