@@ -209,6 +209,35 @@ function queueControls(ticket) {
   return `<section class="queue-controls">${button}<p role="status" class="${record?.error ? 'error-text' : 'muted'}">${escapeHTML(message)}</p></section>`;
 }
 
+function ticketBody(content) {
+  // Present the header metadata in the table, retaining prose and fenced examples.
+  let inHeader = true; let fence = null;
+  return content.split(/\r?\n/).filter((line) => {
+    const marker = line.match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = null;
+      return true;
+    }
+    if (fence) return true;
+    if (/^#{2,6}\s+/.test(line)) inHeader = false;
+    return !inHeader || !/^(Status|Execution|Labels|Blocked by|Commits):\s*/i.test(line.replace(/\*\*/g, ''));
+  }).join('\n');
+}
+
+function ticketInfo(ticket) {
+  const progress = ticket.progress.total ? `<div class="acceptance-progress"><progress value="${ticket.progress.checked}" max="${ticket.progress.total}" aria-label="Acceptance criteria progress"></progress><span>${ticket.progress.checked} / ${ticket.progress.total}</span></div>` : '<span class="muted">No acceptance checklist recorded</span>';
+  const rows = [
+    ['Status', `<div class="ticket-meta">${stateChip(ticket.displayState)}</div>`],
+    ['Triage', `<span class="raw-status">${escapeHTML(ticket.metadata.Status || 'Not recorded')}</span>`],
+    ['Labels', `<div class="detail-labels">${ticket.labels.length ? ticket.labels.map(labelChip).join('') : '<span class="muted">None</span>'}</div>`],
+    ['Acceptance criteria', progress],
+    ['Commits', `<div class="commit-record">${commitChips(ticket)}</div>`],
+    ['Dependencies', `<section class="dependency-record">${dependencyList(ticket)}</section>`],
+  ];
+  return `<table class="ticket-info" aria-label="Ticket information"><tbody>${rows.map(([title, values]) => `<tr><th scope="row">${title}</th><td>${values}</td></tr>`).join('')}</tbody></table>`;
+}
+
 async function loadQueue() {
   try {
     const response = await fetch('/api/queue');
@@ -244,9 +273,7 @@ function render() {
     el('detail-kind').textContent = `Ticket ${String(ticket.number ?? '?').padStart(2, '0')}`;
     el('detail-path').textContent = `${ticket.feature}/issues/${ticket.filename}`;
     const filtered = !matchesFilters(ticket) ? '<div class="filtered-selection" role="status">This ticket is outside the current filters. Filters are still active.</div>' : '';
-    const progress = ticket.progress.total ? `<div class="acceptance-progress"><span>Acceptance criteria</span><progress value="${ticket.progress.checked}" max="${ticket.progress.total}" aria-label="Acceptance criteria progress"></progress><span>${ticket.progress.checked} / ${ticket.progress.total}</span></div>` : '<p class="muted acceptance-empty">No acceptance checklist recorded.</p>';
-    el('detail').innerHTML = `${filtered}<div class="ticket-meta">${stateChip(ticket.displayState)}<span class="raw-status">${escapeHTML(ticket.metadata.Status || 'No triage status')}</span></div><div class="detail-labels">${ticket.labels.map(labelChip).join('')}</div>${progress}<div class="commit-record"><span>Implementation commits</span><div>${commitChips(ticket)}</div></div><section class="dependency-record"><h3>Dependencies</h3>${dependencyList(ticket)}</section>${diagnostics(ticket.diagnostics)}<article class="markdown">${markdown(ticket.content)}</article>`;
-    el('detail').insertAdjacentHTML('afterbegin', queueControls(ticket));
+    el('detail').innerHTML = `${queueControls(ticket)}${filtered}${ticketInfo(ticket)}${diagnostics(ticket.diagnostics)}<article class="markdown">${markdown(ticketBody(ticket.content))}</article>`;
   } else if (feature) {
     el('detail-kind').textContent = 'Feature overview';
     el('detail-path').textContent = feature.descriptionFile ? `${feature.name}/${feature.descriptionFile}` : feature.name;

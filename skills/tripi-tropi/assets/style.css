@@ -28,8 +28,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .sidebar-toggle { min-width: 32px; font-size: 20px; padding: 3px 8px; }
 #live-status { margin-left: auto; }
 .queue-session { color: var(--muted); font-size: 11px; min-width: 0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.queue-controls { border-bottom: 1px solid var(--line); margin-bottom: 20px; padding-bottom: 12px; }
-.queue-controls p { font-size: 12px; line-height: 1.6; }
+.queue-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); margin-bottom: 20px; padding-bottom: 16px; }
+.queue-controls button { flex: 0 0 auto; }
+.queue-controls p { flex: 1; min-width: 160px; font-size: 12px; line-height: 1.6; margin: 0; }
 .repo-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .read-only { margin-left: auto; font-size: 12px; color: var(--muted); border-left: 1px solid var(--line); padding-left: 18px; white-space: nowrap; }
 .refresh { background: #253644; border: 1px solid #456073; border-radius: 5px; padding: 7px 12px; }
@@ -192,6 +193,13 @@ tr:hover td { background: var(--control); }
 tr.selected td { background: var(--selection); }
 .dependency-link { background: var(--control); }
 .filter-options, #label-options { background: var(--panel); border-color: var(--control-border); }
+.ticket-info { min-width: 0; table-layout: auto; margin-bottom: 24px; }
+.ticket-info th, .ticket-info td { padding: 8px 0; border: 0; vertical-align: top; background: transparent; }
+.ticket-info th { width: 132px; padding-right: 20px; font-size: 12px; font-weight: 500; }
+.ticket-info td { font-size: 12px; overflow-wrap: anywhere; }
+.ticket-info tr:hover td { background: transparent; }
+.ticket-info .ticket-meta, .ticket-info .detail-labels, .ticket-info .acceptance-progress, .ticket-info .commit-record, .ticket-info .dependency-record { margin: 0; padding: 0; border: 0; }
+.ticket-info .dependency-empty { margin: 0; }
 @media (max-width: 1000px) { .topbar { padding: 0 16px; gap: 14px; } .detail-content { padding: 20px; } }
 @media (max-width: 760px) {
   .workspace { display: flex; flex-direction: column; overflow: hidden; }

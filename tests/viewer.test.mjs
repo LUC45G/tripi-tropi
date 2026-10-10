@@ -119,6 +119,9 @@ test('browser renders original Markdown and hashes, with inert checkboxes and sa
     await page.getByRole('button', { name: 'Diseñar página 404' }).click();
     assert.equal(await page.locator('#detail .markdown h1').textContent(), '01: Diseñar página 404');
     assert.equal(await page.locator('#detail .commit-record code').textContent(), 'abc123456789');
+    assert.deepEqual(await page.locator('.ticket-info th').allTextContents(), ['Status', 'Triage', 'Labels', 'Acceptance criteria', 'Commits', 'Dependencies']);
+    assert.equal(await page.locator('.ticket-info th, .ticket-info td').evaluateAll((nodes) => nodes.every((node) => getComputedStyle(node).borderBottomWidth === '0px')), true);
+    assert.equal(await page.locator('#detail .markdown').textContent().then((text) => text.includes('Status: ready-for-agent')), false);
     assert.equal(await page.locator('#detail .markdown table td').first().textContent(), 'Markdown');
     assert.ok((await page.locator('#detail pre').textContent()).includes('sin traducir'));
     assert.equal(await page.locator('#detail .markdown input[type=checkbox]').isDisabled(), true);

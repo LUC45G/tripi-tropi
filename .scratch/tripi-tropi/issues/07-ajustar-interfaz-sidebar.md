@@ -24,6 +24,7 @@ Entrega completa de presentación y navegación de la sidebar, después del 04, 
 - [x] Mover el botón de colapso a sidebar-note y eliminar todo su texto adicional, conservando un control visible para expandir.
 - [x] Explorar Annnimate e instalar su base GSAP para probar movimiento discreto compatible con reduced motion.
 - [x] Usar 1337 como referencia para fondos y botones, conservando colores de labels y estados.
+- [x] Presentar metadatos del ticket en tabla de título/valores sin bordes, con Queue implementation y su explicación juntos arriba.
 - [ ] Mantener el ticket abierto hasta la conformidad explícita del usuario con la UI.
 
 ## Trabajo realizado
@@ -34,6 +35,8 @@ Segunda entrega: Status y Labels comparten títulos y dropdowns, cierre con clic
 Colores de superficies y botones basados en el 1337 original de MarkMichos/1337-Scheme, fondo #191919 y selección gris. No se encontró una definición editable del tema dentro de la instalación local de Codex; la adaptación usa la fuente original https://github.com/MarkMichos/1337-Scheme/blob/master/1337.tmTheme como referencia, sin afirmar equivalencia exacta con la apariencia de Codex. Se conservaron los colores semánticos de labels y estados.
 
 Verificación: 23 pruebas pasan, incluyendo clic exterior, títulos de filtros, cantidades no duplicadas, botón en el pie, colapso persistente y reduced motion. La sesión Codex vinculada se verificó en navegador tras reiniciar el servidor anterior; desapareció Codex: unavailable. El ticket permanece in-progress por pedido explícito del usuario hasta su conformidad con la UI.
+
+Tercera entrega: encabezado del detalle organizado en tabla semántica de título/valores sin bordes, con filas Status, Triage, Labels, Acceptance criteria, Commits y Dependencies. Queue implementation y su explicación aparecen juntos arriba. Los metadatos reconocidos antes de las secciones se presentan en esa tabla y no se duplican como texto suelto en el Markdown renderizado; título, prosa y ejemplos dentro de fences conservan su contenido. Los archivos originales no se modifican. Se verificó visualmente con el ticket 06 sin encolarlo; las 23 pruebas siguen pasando, incluidas ausencia de bordes y de metadatos duplicados.
 
 ## Estado posterior
 Entregas verificadas: 21d5ec8d3520 y 4c1d7bef077c. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
