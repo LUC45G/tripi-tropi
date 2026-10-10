@@ -1,9 +1,9 @@
 # 03: Mostrar estados, filtros y navegación entre dependencias
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: viewer, dependencies
 Blocked by: 02
-Commits: none
+Commits: c0ba931c6502
 
 ## Estado inicial
 
@@ -37,5 +37,5 @@ Verificación: 17 pruebas pasando, incluidas pruebas de navegador para filtros, 
 
 ## Estado posterior
 
-Implementación verificada; pendiente registrar el commit para cerrar. Se conservan Refresh manual y los archivos de solo lectura. Actualización en vivo y paneles ajustables corresponden al 04, envío al agente al 05 e instalación simplificada al 06.
+Completado y verificado. Commit de implementación: c0ba931c6502. Se conservan Refresh manual y los archivos de solo lectura. Los tickets 04 y 05 quedan desbloqueados. Actualización en vivo y paneles ajustables corresponden al 04, envío al agente al 05 e instalación simplificada al 06.
 
