@@ -100,6 +100,7 @@ function initializeWorkspace() {
 }
 const stateClass = (state) => ({ Completed: 'completed', 'Ready to implement': 'ready', 'In progress': 'in-progress', Blocked: 'blocked', Discarded: 'discarded', Pending: 'pending' }[state] ?? 'unknown');
 const stateChip = (state) => `<span class="state ${stateClass(state)}">${escapeHTML(state)}</span>`;
+const completionChip = (percent) => `<span class="completion-badge" aria-label="${percent}% complete">${percent}%</span>`;
 const commitChips = (ticket) => ticket.commits.length ? ticket.commits.map((hash) => `<code class="commit" title="Implementation commit">${escapeHTML(hash)}</code>`).join(' ') : '<span class="muted">No commits recorded</span>';
 
 function labelClass(label) {
@@ -142,7 +143,9 @@ function navigateTicket(id) {
   const ticket = snapshot.tickets.find((item) => item.id === id);
   if (!ticket) return;
   recordCurrentScroll();
+  const sameFeature = ticket.feature === selectedFeature;
   selectedFeature = ticket.feature; selectedTicket = ticket.id; mobileView = 'detail'; render();
+  if (sameFeature) requestAnimationFrame(() => document.querySelector(`[data-ticket-row="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   el('detail').scrollTop = 0; writeRoute('push');
 }
 
@@ -267,18 +270,20 @@ function render() {
   const scroll = scrollPositions();
   const openDiagnostics = el('detail').querySelector('.diagnostics')?.open;
   updateFilterControls();
-  el('repo-name').textContent = snapshot.repoName ?? 'Local tickets';
+  el('repo-name').textContent = snapshot.repoName ? `/${snapshot.repoName}` : 'Local tickets';
   el('repo-name').title = snapshot.repo ?? '';
   el('feature-count').textContent = snapshot.features.length;
   el('features').innerHTML = snapshot.features.length ? snapshot.features.map((feature) => {
-    const count = snapshot.tickets.filter((ticket) => ticket.feature === feature.name).length;
-    return `<button class="feature ${feature.name === selectedFeature ? 'selected' : ''}" data-feature="${escapeHTML(feature.name)}" ${feature.name === selectedFeature ? 'aria-current="true"' : ''}><span>${escapeHTML(feature.name)}</span><span class="feature-count">${count}</span></button>`;
+    const featureTickets = snapshot.tickets.filter((ticket) => ticket.feature === feature.name);
+    const completed = featureTickets.filter((ticket) => ticket.displayState === 'Completed').length;
+    const percent = featureTickets.length ? Math.round(completed / featureTickets.length * 100) : 0;
+    return `<button class="feature ${feature.name === selectedFeature ? 'selected' : ''}" data-feature="${escapeHTML(feature.name)}" ${feature.name === selectedFeature ? 'aria-current="true"' : ''}><span>${escapeHTML(feature.name)}</span><span class="feature-count">${percent}%</span></button>`;
   }).join('') : '<p class="empty sidebar-empty">No features yet.<br>Create local tickets with to-tickets.</p>';
   const featureTickets = snapshot.tickets.filter((ticket) => ticket.feature === selectedFeature);
   const tickets = featureTickets.filter(matchesFilters);
   el('list-title').textContent = selectedFeature ?? 'Tickets';
-  el('ticket-count').textContent = tickets.length;
-  el('ticket-list').innerHTML = tickets.length ? `<table><thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead><tbody>${tickets.map((ticket) => `<tr class="${ticket.id === selectedTicket ? 'selected' : ''}"><td class="ticket-number">${String(ticket.number ?? '?').padStart(2, '0')}</td><td><button class="ticket-link" data-ticket="${escapeHTML(ticket.id)}">${escapeHTML(ticket.title || ticket.filename)}</button><div class="row-labels">${ticket.labels.map(labelChip).join('')}</div>${ticket.commits.length ? `<div class="row-commits">${commitChips(ticket)}</div>` : ''}</td><td>${stateChip(ticket.displayState)}</td><td><span class="ticket-summary" title="${escapeHTML(summary(ticket))}">${escapeHTML(summary(ticket))}</span></td></tr>`).join('')}</tbody></table>` : `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${featureTickets.length ? 'No tickets match these filters' : selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>${featureTickets.length ? 'Change the selected labels or status, or clear the filters.' : selectedFeature ? 'Tickets will appear here when they are created.' : 'Create a feature and its tickets with to-tickets, then select Refresh.'}</p></div>`;
+  el('ticket-count').textContent = selectedFeature ? '' : tickets.length;
+  el('ticket-list').innerHTML = tickets.length ? `<table><thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead><tbody>${tickets.map((ticket) => `<tr data-ticket-row="${escapeHTML(ticket.id)}" class="${ticket.id === selectedTicket ? 'selected' : ''}"><td class="ticket-number">${String(ticket.number ?? '?').padStart(2, '0')}</td><td><button class="ticket-link" data-ticket="${escapeHTML(ticket.id)}">${escapeHTML(ticket.title || ticket.filename)}</button><div class="row-labels">${ticket.labels.map(labelChip).join('')}</div>${ticket.commits.length ? `<div class="row-commits">${commitChips(ticket)}</div>` : ''}</td><td>${stateChip(ticket.displayState)}${ticket.displayState === 'In progress' ? completionChip(ticket.progress.total ? Math.round(ticket.progress.checked / ticket.progress.total * 100) : 0) : ''}</td><td><span class="ticket-summary" title="${escapeHTML(summary(ticket))}">${escapeHTML(summary(ticket))}</span></td></tr>`).join('')}</tbody></table>` : `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${featureTickets.length ? 'No tickets match these filters' : selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>${featureTickets.length ? 'Change the selected labels or status, or clear the filters.' : selectedFeature ? 'Tickets will appear here when they are created.' : 'Create a feature and its tickets with to-tickets, then select Refresh.'}</p></div>`;
   const ticket = snapshot.tickets.find((item) => item.id === selectedTicket);
   const feature = snapshot.features.find((item) => item.name === selectedFeature);
   if (ticket) {
@@ -291,7 +296,7 @@ function render() {
     el('detail-path').textContent = feature.descriptionFile ? `${feature.name}/${feature.descriptionFile}` : feature.name;
     const counts = new Map();
     for (const item of featureTickets) counts.set(item.displayState, (counts.get(item.displayState) ?? 0) + 1);
-    el('detail').innerHTML = `<div class="feature-overview"><h2>${escapeHTML(feature.name)}</h2><p class="muted">${featureTickets.length} tickets in this feature · All states, independent of filters</p><dl class="state-summary">${[...counts].map(([state, count]) => `<div><dt>${stateChip(state)}</dt><dd>${count}</dd></div>`).join('')}</dl></div>${diagnostics(snapshot.diagnostics)}${feature.description !== null ? `<article class="markdown feature-description">${markdown(feature.description)}</article>` : '<div class="no-description"><h3>No description available</h3><p>This feature has no spec.md or map.md. Its ticket summary is shown above.</p></div>'}`;
+    el('detail').innerHTML = `<div class="feature-overview"><h2>${escapeHTML(feature.name)}</h2><dl class="state-summary">${[...counts].map(([state, count]) => `<div><dt>${stateChip(state)}</dt><dd>${count}</dd></div>`).join('')}</dl></div>${diagnostics(snapshot.diagnostics)}${feature.description !== null ? `<article class="markdown feature-description">${markdown(feature.description)}</article>` : '<div class="no-description"><h3>No description available</h3><p>This feature has no spec.md or map.md. Its ticket summary is shown above.</p></div>'}`;
   } else {
     el('detail-kind').textContent = 'Overview'; el('detail-path').textContent = '';
     el('detail').innerHTML = `${diagnostics(snapshot.diagnostics)}<div class="empty-state"><h3>Your local ticket desk</h3><p>Select a feature to see its summary, then select a ticket to read the full Markdown.</p><p class="muted">Files stay untouched. The viewer only reads.</p></div>`;

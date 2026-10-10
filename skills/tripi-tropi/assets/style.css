@@ -80,6 +80,7 @@ tr.selected td:first-child { box-shadow: inset 3px 0 var(--accent); }
 .ticket-link:hover { color: var(--accent); }
 .ticket-summary { color: var(--muted); font-size: 12px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .state { display: inline-flex; font-size: 11px; padding: 4px 7px; border-radius: 4px; line-height: 1.2; white-space: nowrap; border: 1px solid transparent; }
+.completion-badge { display: inline-flex; margin-left: 6px; color: var(--muted); background: var(--control); border: 1px solid var(--control-border); border-radius: 999px; font-size: 10px; padding: 3px 6px; vertical-align: middle; }
 .pending { color: #c2d0de; background: #293846; border-color: #415362; }
 .ready { color: #a7e4d6; background: #1e403b; border-color: #376c60; }
 .completed { color: #a9ddbd; background: #213e30; border-color: #355e46; }
