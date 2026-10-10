@@ -1,6 +1,6 @@
 # 06: Facilitar la instalación de la skill tripi-tropi
 Status: ready-for-agent
-Execution: pending
+Execution: in-progress
 Labels: installation, skill
 Blocked by: 04, 05
 Commits: none
@@ -28,8 +28,12 @@ Las capacidades finales del visor y la integración con Codex deben estar termin
 
 ## Trabajo realizado
 
-Pendiente. No se realizaron cambios ni verificaciones de implementación.
+Se implementó scripts/install-skill.mjs: destino predeterminado ~/.agents/skills, opción --skills-dir, comprobación de Node 24+ y npm, copia explícita del paquete sin node_modules del desarrollador e instalación reproducible con npm ci usando el lockfile. El paquete se prepara sin SKILL.md activo, se verifica y luego se activa. Un bloqueo serializa instalaciones; --update exige una instalación administrada y conserva la anterior ante fallos de preparación. No se modifican configuración de Codex ni skills ajenas.
+
+README.md documenta instalación desde checkout, selección de commit/tag, descubrimiento, ejecución desde cualquier directorio, parada, actualización y errores accionables. Se confirmó el directorio de usuario y el descubrimiento automático contra la documentación oficial de Codex: https://learn.chatgpt.com/docs/build-skills. Si no aparece, se indica reiniciar Codex; destinos personalizados deben ser ubicaciones reconocidas o usarse por lanzamiento directo.
+
+Verificación: 25 pruebas Node/Edge pasan, sin omisiones. La prueba nueva instala y actualiza en un destino temporal con espacios, abre y detiene tickets originales de dos repositorios, comprueba assets y dependencias servidos y ausencia de modificaciones a tickets. Comprueba rechazo de reemplazos implícitos y carpetas ajenas, conservación de configuración y otra skill, fallos de descarga/paquete incompleto, primera instalación fallida sin paquete activo, bloqueo concurrente y rechazo de destino superpuesto al código fuente. La skill fuente y una copia distribuida instalada en .cache/installation-check pasan el validador oficial. Los nueve tickets pasan validación estricta sin errores ni advertencias.
 
 ## Estado posterior
 
-Pendiente de 04 y 05. Definir la mecánica de distribución al implementar, con base en el paquete final y las instrucciones oficiales vigentes de instalación de skills.
+Implementación y verificaciones terminadas; pendiente registrar el commit real y cerrar este ticket. No se instaló globalmente en el perfil del usuario. La descarga requiere acceso al registro npm; Node.js 24+ con npm es obligatorio. Los shortcuts y los tickets 07, 08 y 09 conservan su alcance y estado.
