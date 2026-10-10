@@ -1,9 +1,9 @@
 # 04: Actualizar el visor en vivo y conservar el espacio de trabajo
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: viewer, realtime
 Blocked by: 03
-Commits: none
+Commits: 2063d17adcd7
 
 ## Estado inicial
 
@@ -38,5 +38,5 @@ Problema encontrado y resuelto: en Windows, reemplazar temporalmente .scratch po
 
 ## Estado posterior
 
-Implementación verificada. Falta registrar el hash real del commit de implementación y cerrar el ticket mediante un commit de registro. El ticket 05 queda como siguiente trabajo; 06 depende de 04 y 05. Los shortcuts de aplicación siguen pendientes a futuro. La interfaz continúa siendo de solo lectura.
+Completado y verificado. Commit de implementación: 2063d17adcd7; hash registrado mediante este cierre separado. El ticket 05 queda listo para implementar; 06 sigue bloqueado por 05. Los shortcuts de aplicación siguen pendientes a futuro. La interfaz continúa siendo de solo lectura.
 
