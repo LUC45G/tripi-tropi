@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520, 4c1d7bef077c
+Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733
 
 ## Estado inicial
 
@@ -39,7 +39,7 @@ Verificación: 23 pruebas pasan, incluyendo clic exterior, títulos de filtros, 
 Tercera entrega: encabezado del detalle organizado en tabla semántica de título/valores sin bordes, con filas Status, Triage, Labels, Acceptance criteria, Commits y Dependencies. Queue implementation y su explicación aparecen juntos arriba. Los metadatos reconocidos antes de las secciones se presentan en esa tabla y no se duplican como texto suelto en el Markdown renderizado; título, prosa y ejemplos dentro de fences conservan su contenido. Los archivos originales no se modifican. Se verificó visualmente con el ticket 06 sin encolarlo; las 23 pruebas siguen pasando, incluidas ausencia de bordes y de metadatos duplicados.
 
 ## Estado posterior
-Entregas verificadas: 21d5ec8d3520 y 4c1d7bef077c. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
+Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c y 6458e758c733. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
 
 ## Comments
 
