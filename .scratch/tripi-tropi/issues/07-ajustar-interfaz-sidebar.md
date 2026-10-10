@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a
+Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a, 7b26ad6251d8
 
 ## Estado inicial
 
@@ -50,6 +50,8 @@ Cuarta entrega: botón de colapso al 100% del ancho disponible del pie y Markdow
 Quinta entrega pendiente: completar la información visual de progreso y simplificar los encabezados. El porcentaje de una feature debe contar tickets Completed sobre todos sus tickets, sin depender de los filtros activos. El porcentaje de un ticket In progress debe derivarse de sus criterios de aceptación detectados en Markdown; los tickets sin criterios muestran 0% y los completados 100%. La ruta del repositorio debe comenzar con `/` en el header y el encabezado de la feature debe conservar únicamente su título.
 
 Quinta entrega implementada: la sidebar muestra el porcentaje de tickets Completed por feature. Los tickets In progress muestran el porcentaje derivado de sus criterios de aceptación, mientras que el resto conserva su estado. El repositorio aparece con `/` inicial y el encabezado de feature ya no repite la cantidad de tickets. Las dependencias que apuntan a un ticket de la misma feature conservan el detalle seleccionado y desplazan la tabla de la mitad izquierda hasta la fila destino. Se verificó con la suite completa: 25 pruebas pasan y la validación estricta no informa errores ni advertencias. El ticket permanece abierto para revisión visual explícita.
+
+Corrección posterior: el desplazamiento de una dependencia ahora centra la fila destino en la mitad izquierda en lugar de usar un desplazamiento mínimo, que podía dejar el ticket cortado al subir. Las pruebas de viewer y navegador pasan 6/6.
 
 ## Estado posterior
 Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733 y 20f4f8c58f68. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
