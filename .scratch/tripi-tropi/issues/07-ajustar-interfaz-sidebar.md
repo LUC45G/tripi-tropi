@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520
+Commits: 21d5ec8d3520, 4c1d7bef077c
 
 ## Estado inicial
 
@@ -36,7 +36,7 @@ Colores de superficies y botones basados en el 1337 original de MarkMichos/1337-
 Verificación: 23 pruebas pasan, incluyendo clic exterior, títulos de filtros, cantidades no duplicadas, botón en el pie, colapso persistente y reduced motion. La sesión Codex vinculada se verificó en navegador tras reiniciar el servidor anterior; desapareció Codex: unavailable. El ticket permanece in-progress por pedido explícito del usuario hasta su conformidad con la UI.
 
 ## Estado posterior
-Primera entrega verificada: 21d5ec8d3520. Reabierto por nuevos ajustes solicitados y revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
+Entregas verificadas: 21d5ec8d3520 y 4c1d7bef077c. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
 
 ## Comments
 
