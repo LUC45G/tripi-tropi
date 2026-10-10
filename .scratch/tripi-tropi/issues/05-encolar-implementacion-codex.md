@@ -1,9 +1,9 @@
 # 05: Encolar la implementación de un ticket en Codex
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: codex, integration
 Blocked by: 03
-Commits: none
+Commits: aba21d8ca745
 
 ## Estado inicial
 
@@ -41,5 +41,5 @@ Prueba real autorizada por el usuario: codex queue aceptó una orden inocua diri
 
 ## Estado posterior
 
-Implementación verificada; pendiente registrar hash real y cierre. La entrega depende de codex queue disponible en PATH y una sesión válida. Las entregas fallidas o inciertas requieren revisar manualmente la sesión antes de volver a enviar; la UI no reintenta. El ticket 06 queda listo al cerrar 05. Los ajustes adicionales del 07 se harán después, en otro commit.
+Completado y verificado. Implementación aba21d8ca745; hash registrado en este cierre separado. La entrega depende de codex queue disponible en PATH y una sesión válida. Las entregas fallidas o inciertas requieren revisar manualmente la sesión antes de volver a enviar; la UI no reintenta. El ticket 06 queda listo. Los ajustes adicionales del 07 se harán después, en otro commit.
 
