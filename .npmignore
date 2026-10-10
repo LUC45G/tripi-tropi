@@ -1,0 +1,9 @@
+node_modules/
+coverage/
+.cache/
+*.log
+skills/tripi-tropi/node_modules/
+tests/
+.scratch/
+.git/
+.github/

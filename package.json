@@ -1,9 +1,11 @@
 {
   "name": "tripi-tropi",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.1",
+  "private": false,
   "type": "module",
   "engines": { "node": ">=24" },
+  "bin": { "tripi-tropi": "scripts/tripi-tropi-cli.mjs" },
+  "files": ["scripts/install-skill.mjs", "scripts/tripi-tropi-cli.mjs", "skills/tripi-tropi/SKILL.md", "skills/tripi-tropi/agents", "skills/tripi-tropi/assets", "skills/tripi-tropi/references", "skills/tripi-tropi/scripts", "skills/tripi-tropi/package.json", "skills/tripi-tropi/package-lock.json"],
   "devDependencies": { "playwright": "1.64.0" },
   "scripts": {
     "test": "node --test",
