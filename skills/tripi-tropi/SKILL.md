@@ -7,7 +7,7 @@ description: Open a local read-only web viewer for to-tickets Markdown tickets u
 
 Open the bundled application; do not recreate the viewer in the user's repository.
 
-1. Resolve the user's repository (current workspace by default) and this skill's absolute directory. Read repository instructions; before authoring tickets, read [the mandatory ticket guide](references/ticket-writing.md). Opening the viewer does not adopt or edit repository conventions.
+1. Resolve the user's repository (current workspace by default) and this skill's absolute directory. Read repository instructions; when creating, editing or implementing tickets, follow [the mandatory ticket workflow](references/ticket-writing.md). For discovery it provides a read-only TOON index. Opening the viewer does not adopt or edit repository conventions.
 2. If dependencies are absent, run `npm ci --prefix <skill-directory>` using the bundled lockfile. Request the environment's normal permissions if package installation, local binding, background processes, or opening the browser requires them.
 3. Run `node <skill-directory>/scripts/launch.mjs --repo <repo>`. This starts a detached local server, or reuses the existing instance, then opens its URL in the default browser. Use `--port <number>` for a chosen port and `--no-open` when no browser handoff is wanted.
    To link the agent destination, pass `--thread <session UUID or exact name>`; otherwise the launcher inherits `CODEX_THREAD_ID`. Without either, queue controls are disabled. The destination appears in the interface. Reusing an instance requires the same linked destination; stop and relaunch to change it.

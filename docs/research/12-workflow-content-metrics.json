@@ -1,0 +1,28 @@
+{
+  "baseline": "7c03b533b2f0b060cd9cef9418f7e1202bcf85ed",
+  "unit": "UTF-8 bytes, LF, no BOM; not billed tokens",
+  "creationReading": {
+    "beforeBytes": 10372,
+    "afterBytes": 9827,
+    "reductionPercent": 5.25
+  },
+  "implementationReading": {
+    "beforeBytes": 19994,
+    "afterBytes": 17322,
+    "reductionPercent": 13.36
+  },
+  "canonicalGuide": {
+    "beforeBytes": 6310,
+    "afterBytes": 4105,
+    "reductionPercent": 34.94
+  },
+  "metadataSerialization": {
+    "beforeBytes": 3977,
+    "afterBytes": 2848,
+    "reductionPercent": 28.39
+  },
+  "checks": {
+    "toonRoundtrip": true,
+    "unchangedExistingTicketSemantics": 11
+  }
+}

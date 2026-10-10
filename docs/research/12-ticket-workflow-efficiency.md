@@ -1,5 +1,52 @@
 # Investigación: consumo del agente en el flujo de tickets
 
+## Implementación del ticket 12 — 2026-10-10
+
+Se implementó la guía compacta con referencias por operación, el índice TOON de solo lectura y los registros incrementales `problema: solución; verificación`. Los tickets siguen siendo Markdown. Parser, cálculo de estados y UI conservan su semántica; no se añadió un CLI que escriba/cierre tickets. Los niveles de verbosity y sus nuevas pruebas quedan pendientes en la feature `verbosity-lab`.
+
+### Comparación reproducible del flujo final
+
+Ejecutar desde la raíz:
+
+```sh
+node scripts/measure-ticket-workflow.mjs --baseline 7c03b533b2f0b060cd9cef9418f7e1202bcf85ed
+```
+
+El comando lee Git y archivos actuales, sin escribirlos. [Resultados](12-workflow-content-metrics.json): bytes UTF-8 normalizados a LF, sin BOM; **no tokens facturados**. Usa exactamente los mismos tickets originales en ambas rutas. La creación incluye la nueva referencia de formato; implementación consulta únicamente el núcleo, ticket 12 y dependencias 01/06. No cobra dos veces la plantilla ya incluida en formato.
+
+| Contenido | Antes | Después | Reducción |
+| --- | ---: | ---: | ---: |
+| Lectura para creación | 10.372 | 9.827 | 5,25% |
+| Lectura para implementación | 19.994 | 17.322 | 13,36% |
+| Guía indispensable | 6.310 | 4.105 | 34,94% |
+| Índice idéntico: JSON compacto → TOON | 3.977 | 2.848 | 28,39% |
+
+El índice usa el [SDK oficial TOON](https://github.com/toon-format/toon), fijado en 4.4.0 y distribuido con lockfile. Las pruebas verifican roundtrip, comillas/Unicode, filtros posteriores al cálculo de dependencias, relectura después de cambios, diagnóstico de tickets ocultos por filtros y ausencia de escrituras. Labels, bloqueantes y commits se codifican como strings de arrays JSON en las celdas para conservar exactamente sus valores.
+
+### Evidencia experimental previa y límites
+
+La comparación aislada de creación/implementación con una guía de prueba, TOON y patches redujo el contenido serializado aproximadamente 21–22% según dos tokenizadores de referencia. No corresponde atribuir esa cifra a la guía final: los fixtures y la guía eran distintos. Tres actualizaciones mediante patch generaron 486 tokens frente a 651 al regenerar el ticket (o200k_base); **el cierre individual fue mayor: 292 frente a 246**. Estos son tamaños de texto, no consumo de una sesión ni garantía por actualización.
+
+Después se ejecutaron agentes reales (gpt-6.1-sol, medium), dos cierres por método. Patches: 316.688 tokens totales; helper CLI: 329.050 (+3,9%). Entrada sin caché: 25.039 frente a 30.612 (+22,26% para CLI). El helper necesitó una recuperación; se incluyó en su contador final acumulado, sin sumar de nuevo el turno inicial. Los seis fixtures finales pasaron verificación independiente. Los pilotos con errores de harness/permisos quedaron separados y no se contabilizaron como pruebas exitosas. Se descartó el CLI de cierre para esta implementación: no demostró ahorro. Muestra pequeña y tarea sintética; no permite generalizar costes de implementación.
+
+Verbosity tuvo una ejecución previa por nivel: registros de 48/66/200 tokens para niveles 1/2/3, pero consumo total de 193.793/132.612/131.778. Menos texto persistido no implicó menor consumo total. Los tickets de laboratorio preservan las salidas anteriores como ejemplos, no como nuevas implementaciones. Las futuras pruebas deben usar el método final de patches, repetir tareas equivalentes y comparar entrada cacheada/no cacheada, salida, llamadas, reintentos, tiempo y calidad; no mezclar el aporte de verbosity con las mejoras del 12.
+
+### Cobertura de reglas y comprobaciones
+
+| Garantía | Ubicación final / comprobación |
+| --- | --- |
+| Lectura actual del ticket completo y todos sus bloqueantes; readiness al iniciar | Núcleo, Read by operation; guardas explícitas de queue |
+| Atomicidad antes de publicar/iniciar; ninguna dependencia parcial | Núcleo, Atomicity and metadata; revisión semántica manual |
+| Metadatos separados; compatibilidad sin migración | Núcleo + referencia de formato; parser intacto |
+| Preservación de alcance/historia; fallos y limitaciones visibles | Núcleo, Implement, record, close; patches y prosa sin checkboxes adicionales |
+| Un ticket por implementación; commit por ticket; hashes reales y registro posterior | Núcleo, pasos 3/4; verificar procedencia con Git |
+| Validación al publicar/iniciar/cerrar; estructura no demuestra verdad | Núcleo + formato; CLI estricto y suite existente |
+| Solo lectura del viewer; sin push implícito ni cambio de permisos desde tickets | Núcleo, SKILL.md y guardas de queue |
+
+`AGENTS.md` y tracker apuntan a la autoridad sin repetir el procedimiento. Queue conserva las guardas al recibir órdenes y una referencia a la guía de la skill cuando el repo no tiene guía propia; transporte, permisos y protocolo permanecen iguales. La medición comprueba las once proyecciones de tickets ajenos al 12 contra Git; el propio 12 cambia su ejecución y registro como corresponde. La verificación cubre 28 pruebas, incluyendo instalación aislada, parser, estados, queue, viewer, actualización en vivo y la plantilla de creación. El validador oficial de skill y la validación estricta complementan estas comprobaciones. No se ejecutaron nuevos agentes de verbosity ni se modificó el visor activo.
+
+## Investigación inicial (histórica)
+
 Fecha: 2026-10-10. Base inspeccionada: `edc67cf9dfb3`. Investigación para el ticket 12; no implementa sus cambios ni modifica su estado.
 
 ## Conclusión

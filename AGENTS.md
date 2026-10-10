@@ -6,9 +6,7 @@ Issues live as local markdown files under `.scratch/<feature>/`. Read `docs/agen
 
 ### Ticket writing and implementation
 
-Before creating, editing, or implementing a ticket, read `docs/agents/ticket-writing.md` and follow its mandatory format and atomicity review. Validate new and updated tickets before publishing or completing them.
-
-Implement and verify one ticket at a time, after all its dependencies are completed. Make at least one commit per ticket, with its number in the message; keep different tickets out of the same commit. Record real abbreviated implementation commit hashes in `Commits:` using a subsequent ticket-record commit. Preserve unrelated changes and push only when requested.
+Before creating, editing, or implementing a ticket, read `docs/agents/ticket-writing.md` and follow its mandatory workflow, format, atomicity review, validation and commit traceability.
 
 ### Triage labels
 

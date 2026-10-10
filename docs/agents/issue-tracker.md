@@ -2,7 +2,7 @@
 
 Issues and specs for this repo live as markdown files in `.scratch/`.
 
-Before creating or updating tickets, follow the mandatory [ticket writing guide](ticket-writing.md). New tickets separate triage (`Status:`), execution (`Execution:`), labels (`Labels:`), dependencies (`Blocked by:`), and abbreviated implementation commit hashes (`Commits:`). Existing tickets remain readable without migration.
+Before creating or updating tickets, follow the mandatory [ticket writing guide](ticket-writing.md). For compact discovery use its read-only TOON index; then read the selected ticket and its dependencies. Existing tickets remain readable without migration.
 
 ## Conventions
 

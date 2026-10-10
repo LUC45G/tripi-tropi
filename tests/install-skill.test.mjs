@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { installSkill } from '../scripts/install-skill.mjs';
 
 function launch(skill, repo, stop = false) {
@@ -31,6 +31,10 @@ test('isolated installation is complete, launches two repositories, and updates 
     assert.equal(await readFile(path.join(root, 'config.toml'), 'utf8'), 'preserve config');
     await assert.rejects(installSkill({ skillsDir, installDependencies: async () => {} }), /--update/);
     assert.match(await readFile(path.join(skill, 'SKILL.md'), 'utf8'), /name: tripi-tropi/);
+    assert.match(await readFile(path.join(skill, 'references/ticket-format.md'), 'utf8'), /```markdown/);
+    const index = spawnSync(process.execPath, [path.join(skill, 'scripts/ticket-index.mjs'), '--repo', root, '--json'], { encoding: 'utf8', windowsHide: true });
+    assert.equal(index.status, 0, index.stderr);
+    assert.deepEqual(JSON.parse(index.stdout), { tickets: [], diagnostics: [] });
     await assert.rejects(readFile(path.join(skill, 'node_modules/playwright/package.json')), /ENOENT/);
     for (const [index, repo] of repos.entries()) {
       const issues = path.join(repo, '.scratch/demo/issues');
