@@ -1,9 +1,9 @@
 # 03: Comparar salida con Verbosity 3
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: experiment, tokens, verbosity-3
 Blocked by: none
-Commits: none
+Commits: f68da2852e5e
 Verbosity: 3
 
 ## Initial state
@@ -25,7 +25,7 @@ Tests: 3/3 cierres válidos, fixture 3/3; fallo controlado y limitación preserv
 
 ## Final state
 
-Verificado; pendiente registrar los commits y cerrar.
+3/3 cierres válidos; hash real registrado. Comparación de nueve sesiones en spec.md y results/summary.json: nivel 1 reduce salida y texto persistido, pero no demuestra ahorro total general. La caché fría del primer caso y la variación de entrada impiden atribuir costes a verbosity. Siguiente paso de investigación: tareas variadas, repeticiones por caso y orden/caché balanceados. La skill y la aplicación conservan sus reglas; no se hizo push.
 
 ## Comments
 
