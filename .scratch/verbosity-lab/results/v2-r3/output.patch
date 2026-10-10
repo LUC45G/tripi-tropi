@@ -1,0 +1,29 @@
+--- a/.scratch/verbosity-lab/results/v2-r3/ticket.md
++++ b/.scratch/verbosity-lab/results/v2-r3/ticket.md
+@@ -1,6 +1,6 @@
+ # 01: Verify integer-sum fixture
+ Status: ready-for-agent
+-Execution: in-progress
++Execution: completed
+ Labels: experiment
+ Blocked by: none
+ Commits: 05f5060da4d2
+@@ -11,10 +11,13 @@
+ ### Atomicity
+ One isolated verified result; no dependencies or interleaving.
+ ### Acceptance criteria
+-- [ ] Positive integer sum verified.
+-- [ ] Negative integer sum verified.
+-- [ ] Fractional input rejection verified.
++- [x] Positive integer sum verified.
++- [x] Negative integer sum verified.
++- [x] Fractional input rejection verified.
+ ## Work performed
+-Pending.
++- Fixture: positive and negative integer sums and fractional input rejection verified.
++- Verification: `node --test .scratch/verbosity-lab/fixture/sum.test.mjs` passed all 3 tests.
++- Issues: no observed failures.
++- Limitation: overflow and unsafe-integer precision were not tested.
+ ## Final state
+-Pending.
++All three acceptance criteria verified; no remaining work. Numeric coverage excludes overflow and unsafe-integer precision.
