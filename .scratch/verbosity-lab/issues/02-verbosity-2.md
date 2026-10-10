@@ -1,9 +1,9 @@
 # 02: Comparar salida con Verbosity 2
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: experiment, tokens, verbosity-2
 Blocked by: none
-Commits: none
+Commits: 7d29f4568fca
 Verbosity: 2
 
 ## Initial state
@@ -25,7 +25,7 @@ Tests: 3/3 cierres válidos, fixture 3/3; fallo controlado y limitación preserv
 
 ## Final state
 
-Verificado; pendiente registrar los commits y cerrar.
+3/3 cierres válidos; hash real registrado. Comparación total pendiente del nivel 3.
 
 ## Comments
 
