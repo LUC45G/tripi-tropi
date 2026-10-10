@@ -12,18 +12,18 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="tripi-tropi home"><span class="brand-mark" aria-hidden="true">tt</span>tripi-tropi</a>
+    <a class="brand" href="/" aria-label="tripi-tropi home"><img class="brand-mark" src="/icon.svg" alt="">tripi-tropi</a>
+    <button id="toggle-sidebar" class="refresh sidebar-toggle" type="button" aria-label="Collapse features sidebar" aria-expanded="true" aria-controls="feature-sidebar">‹</button>
     <span class="repo-name" id="repo-name">Local tickets</span>
-    <span class="live-status" id="live-status" role="status">Connecting…</span>
-    <span class="read-only">Read-only</span>
+    <span class="live-status" id="live-status" role="status" title="Connection for automatic updates from local files">Connecting…</span>
     <button class="refresh" id="refresh" type="button">Refresh</button>
   </header>
   <div id="error" role="alert" hidden></div>
   <main class="workspace">
-    <aside class="sidebar" aria-label="Features">
+    <aside class="sidebar" id="feature-sidebar" aria-label="Features">
       <div class="panel-heading"><h1>Features</h1><span id="feature-count" class="count">0</span></div>
       <nav id="features" aria-label="Choose a feature"></nav>
-      <div class="sidebar-note"><span class="connection-dot" aria-hidden="true"></span>Local Markdown<span>Updates automatically when files change.</span></div>
+      <div class="sidebar-note"><span class="connection-dot" aria-hidden="true"></span>Local Markdown</div>
     </aside>
     <div class="splitter" id="sidebar-splitter" role="separator" aria-label="Resize feature sidebar" aria-orientation="vertical" tabindex="0" aria-valuemin="160" aria-valuemax="400" aria-valuenow="220"></div>
     <section class="tickets-pane" aria-label="Tickets">

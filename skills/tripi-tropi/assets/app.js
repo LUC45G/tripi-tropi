@@ -10,6 +10,7 @@ const selectedLabels = new Set();
 let workspaceKey;
 let mobileView = 'list';
 let layout = { sidebar: 220, split: 50 };
+let sidebarCollapsed = false;
 let storageTimer;
 let eventSource;
 const workspace = document.querySelector('.workspace');
@@ -28,7 +29,7 @@ function savedWorkspace() {
 }
 function persistWorkspace() {
   if (!workspaceKey) return;
-  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, layout, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
+  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, layout, sidebarCollapsed, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
 }
 function readRoute() {
   const params = new URLSearchParams(location.search);
@@ -51,8 +52,8 @@ function recordCurrentScroll() { history.replaceState({ scroll: scrollPositions(
 function applyLayout() {
   const width = workspace.clientWidth;
   const sidebarMax = Math.max(160, Math.min(400, width - 510));
-  const sidebar = clamp(layout.sidebar, 160, sidebarMax);
-  const available = Math.max(0, width - sidebar - 12);
+  const sidebar = sidebarCollapsed ? 0 : clamp(layout.sidebar, 160, sidebarMax);
+  const available = Math.max(0, width - sidebar - (sidebarCollapsed ? 6 : 12));
   const minimumPercent = Math.min(40, (240 / Math.max(1, available)) * 100);
   const split = clamp(layout.split, minimumPercent, 100 - minimumPercent);
   workspace.style.setProperty('--sidebar-size', `${sidebar}px`);
@@ -63,6 +64,10 @@ function applyLayout() {
   el('detail-splitter').setAttribute('aria-valuemin', String(Math.round(minimumPercent)));
   el('detail-splitter').setAttribute('aria-valuemax', String(Math.round(100 - minimumPercent)));
   el('detail-splitter').setAttribute('aria-valuenow', String(Math.round(split)));
+  workspace.dataset.sidebarCollapsed = String(sidebarCollapsed);
+  el('toggle-sidebar').setAttribute('aria-expanded', String(!sidebarCollapsed));
+  el('toggle-sidebar').setAttribute('aria-label', `${sidebarCollapsed ? 'Expand' : 'Collapse'} features sidebar`);
+  el('toggle-sidebar').textContent = sidebarCollapsed ? '›' : '‹';
 }
 function applyMobileView() {
   workspace.dataset.mobileView = mobileView;
@@ -71,6 +76,7 @@ function applyMobileView() {
 function initializeWorkspace() {
   workspaceKey = `tripi-tropi:${snapshot.repo}`;
   const saved = savedWorkspace();
+  sidebarCollapsed = saved.sidebarCollapsed === true;
   if (Number.isFinite(saved.layout?.sidebar) && Number.isFinite(saved.layout?.split)) layout = saved.layout;
   if (location.search) readRoute();
   else {
@@ -301,6 +307,7 @@ el('clear-filters').addEventListener('click', () => {
   recordCurrentScroll(); selectedLabels.clear(); selectedState = ''; renderFilters(); render(); writeRoute('push');
 });
 el('refresh').addEventListener('click', refresh);
+el('toggle-sidebar').addEventListener('click', () => { sidebarCollapsed = !sidebarCollapsed; applyLayout(); persistWorkspace(); });
 for (const pane of [el('detail'), el('ticket-list'), el('features')]) pane.addEventListener('scroll', () => {
   clearTimeout(storageTimer); storageTimer = setTimeout(() => { persistWorkspace(); recordCurrentScroll(); }, 150);
 }, { passive: true });
@@ -323,8 +330,8 @@ for (const [id, kind] of [['sidebar-splitter', 'sidebar'], ['detail-splitter', '
     if (kind === 'sidebar') layout.sidebar = clamp(offset, 160, Number(splitter.getAttribute('aria-valuemax')));
     else {
       const sidebar = document.querySelector('.sidebar').getBoundingClientRect().width;
-      const available = workspace.clientWidth - sidebar - 12;
-      layout.split = clamp((offset - sidebar - 6) / available * 100, Number(splitter.getAttribute('aria-valuemin')), Number(splitter.getAttribute('aria-valuemax')));
+      const available = workspace.clientWidth - sidebar - (sidebarCollapsed ? 6 : 12);
+      layout.split = clamp((offset - sidebar - (sidebarCollapsed ? 0 : 6)) / available * 100, Number(splitter.getAttribute('aria-valuemin')), Number(splitter.getAttribute('aria-valuemax')));
     }
     applyLayout();
   });
