@@ -4,6 +4,7 @@ import { readFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { timingSafeEqual } from 'node:crypto';
 import { loadTickets } from './tickets.mjs';
+import { deriveTicketStates } from './ticket-states.mjs';
 
 const skillRoot = fileURLToPath(new URL('../', import.meta.url));
 const staticFiles = new Map([
@@ -13,16 +14,6 @@ const staticFiles = new Map([
   ['/vendor/marked.js', ['node_modules/marked/lib/marked.umd.js', 'text/javascript']],
   ['/vendor/purify.js', ['node_modules/dompurify/dist/purify.min.js', 'text/javascript']],
 ]);
-
-export function explicitState(ticket) {
-  const state = ticket.execution || ticket.status;
-  if (['completed', 'resolved', 'done'].includes(state)) return 'Completed';
-  if (['in-progress', 'claimed'].includes(state)) return 'In progress';
-  if (state === 'blocked') return 'Blocked';
-  if (['discarded', 'wontfix'].includes(state)) return 'Discarded';
-  if (['pending', 'open', ''].includes(state) || ticket.labels.includes(ticket.status)) return 'Pending';
-  return 'Unknown';
-}
 
 export async function createViewer({ repo, port = 0, controlToken = '' }) {
   const root = await realpath(path.resolve(repo));
@@ -53,7 +44,7 @@ export async function createViewer({ repo, port = 0, controlToken = '' }) {
       if (pathname === '/api/health') return json(200, { app: 'tripi-tropi', version: 1, repo: root, pid: process.pid });
       if (pathname === '/api/snapshot') {
         const data = await loadTickets(root);
-        return json(200, { ...data, repo: root, repoName: path.basename(root), tickets: data.tickets.map((ticket) => ({ ...ticket, displayState: explicitState(ticket) })) });
+        return json(200, { ...data, repo: root, repoName: path.basename(root), tickets: deriveTicketStates(data.tickets) });
       }
       const resource = staticFiles.get(pathname);
       if (!resource) return json(404, { error: 'Resource not found.' });

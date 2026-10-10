@@ -163,3 +163,75 @@ test('detached launcher reuses same repo, separates another repo and stops only 
     await rm(first, { recursive: true, force: true }); await rm(second, { recursive: true, force: true });
   }
 });
+
+test('browser filters use label OR and status AND and navigate to blockers outside filters without writes', { skip: !browserAvailable }, async () => {
+  const repo = await fixture();
+  const issues = path.join(repo, '.scratch/feature-original/issues');
+  const make = (number, title, status, labels, blocker = 'none') => `# ${number}: ${title}\nStatus: ${status}\nExecution: pending\nLabels: ${labels}\nBlocked by: ${blocker}\nCommits: none\n\n## What to build\nDeliver ${title}.\n## Acceptance criteria\n- [x] Acceptance progress\n\n[Previous ticket](01-original.md)\n`;
+  const second = make(2, 'Backend ready', 'ready-for-agent', 'backend', '01');
+  await writeFile(path.join(issues, '02-ready.md'), second);
+  await writeFile(path.join(issues, '03-blocked.md'), make(3, 'Dependent work', 'ready-for-agent', 'ops', '02'));
+  await writeFile(path.join(issues, '04-pending.md'), make(4, 'Need information', 'needs-info', 'design'));
+  await writeFile(path.join(issues, '05-human.md'), make(5, 'Human work', 'ready-for-human', 'backend'));
+  await writeFile(path.join(issues, '06-invalid.md'), make(6, 'Missing dependency', 'ready-for-agent', 'backend', '99'));
+  const other = path.join(repo, '.scratch/other-feature/issues');
+  await mkdir(other, { recursive: true });
+  await writeFile(path.join(other, '01-other.md'), make(1, 'Other feature work', 'ready-for-agent', 'design'));
+  const before = await digest(repo);
+  const viewer = await createViewer({ repo });
+  const browser = await chromium.launch({ executablePath: browserPath, headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    await page.goto(viewer.url);
+    await page.getByRole('button', { name: 'Dependent work', exact: true }).waitFor();
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 6);
+    await page.locator('#state-filter').selectOption('Blocked');
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 2);
+    await page.locator('#label-summary').click();
+    await page.locator('input[data-label="ops"]').check();
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 1);
+    await page.locator('input[data-label="backend"]').check();
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 2);
+    await page.locator('#state-filter').selectOption('Ready to implement');
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 2);
+    await page.locator('input[data-label="backend"]').uncheck();
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 0);
+    assert.equal(await page.getByText('No tickets match these filters', { exact: true }).count(), 1);
+    await page.locator('#state-filter').selectOption('Blocked');
+    await page.locator('#label-summary').click();
+    await page.getByRole('button', { name: 'Dependent work', exact: true }).click();
+    assert.equal(await page.locator('#detail .ticket-meta .state').textContent(), 'Blocked');
+    assert.equal(await page.locator('#detail .acceptance-progress').textContent().then((text) => text.includes('1 / 1')), true);
+    await page.locator('#detail .dependency-link[data-ticket]').click();
+    assert.equal(await page.locator('#detail .markdown h1').textContent(), '2: Backend ready');
+    assert.equal(await page.locator('#detail .ticket-meta .state').textContent(), 'Ready to implement');
+    assert.equal(await page.locator('#detail .filtered-selection').count(), 1);
+    assert.equal(await page.locator('#state-filter').inputValue(), 'Blocked');
+    assert.equal(await page.locator('input[data-label="ops"]').isChecked(), true);
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 1);
+    assert.equal(await page.locator('#detail .dependency-resolved').count(), 1);
+    await page.locator('#detail .markdown a[data-ticket]').click();
+    assert.equal(await page.locator('#detail .markdown h1').textContent(), '01: Diseñar página 404');
+    assert.equal(await page.locator('#detail .commit-record code').textContent(), 'abc123456789');
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await page.getByRole('button', { name: 'Missing dependency', exact: true }).click();
+    assert.equal(await page.locator('#detail .dependency-invalid').count(), 1);
+    assert.equal(await page.locator('#detail .dependency-link[data-ticket]').count(), 0);
+    assert.ok((await page.locator('#detail .dependency-invalid').textContent()).includes('Ticket not found'));
+    await page.locator('[data-feature="other-feature"]').click();
+    assert.equal(await page.locator('#ticket-list tbody tr').count(), 1);
+    await page.locator('[data-feature="feature-original"]').click();
+    await page.getByRole('button', { name: 'Dependent work', exact: true }).click();
+    await page.screenshot({ path: '.cache/tripi-tropi-states.png', fullPage: true });
+    // Agent's external completion recalculates the dependent's frontier on Refresh.
+    await writeFile(path.join(issues, '02-ready.md'), second.replace('Execution: pending', 'Execution: completed').replace('Commits: none', 'Commits: def123456789'));
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.locator('#detail .ticket-meta .ready').waitFor();
+    assert.equal(await page.locator('#detail .dependency-resolved').count(), 1);
+    await writeFile(path.join(issues, '02-ready.md'), second);
+    assert.deepEqual(await digest(repo), before);
+  } finally {
+    await browser.close(); await new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
+    await rm(repo, { recursive: true, force: true });
+  }
+});

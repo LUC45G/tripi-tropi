@@ -25,6 +25,11 @@
     </aside>
     <section class="tickets-pane" aria-label="Tickets">
       <div class="panel-heading"><div><h2 id="list-title">Tickets</h2><p id="list-subtitle">Choose a feature to browse its work.</p></div><span id="ticket-count" class="count">0</span></div>
+      <div class="filters" aria-label="Ticket filters">
+        <label class="state-filter">Status<select id="state-filter"><option value="">All states</option><option>Pending</option><option>Ready to implement</option><option>In progress</option><option>Blocked</option><option>Completed</option><option>Discarded</option><option>Unknown</option></select></label>
+        <details class="label-filter" id="label-filter"><summary id="label-summary">Labels · All</summary><div id="label-options"></div></details>
+        <button id="clear-filters" class="clear-filters" type="button" disabled>Clear</button>
+      </div>
       <div id="ticket-list" class="table-scroll"><p class="empty">Loading local tickets…</p></div>
     </section>
     <section class="detail-pane" aria-label="Selected detail" tabindex="-1">

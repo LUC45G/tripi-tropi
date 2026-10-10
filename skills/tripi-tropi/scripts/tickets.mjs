@@ -12,7 +12,7 @@ export const within = (root, target) => {
 };
 
 /** Reads metadata outside code fences, never interprets file content as code. */
-export function parseTicket(content, { feature, filename, strict = false, triage = DEFAULT_TRIAGE } = {}) {
+export function parseTicket(content, { feature, filename, strict = false, triage = DEFAULT_TRIAGE, triageRoles = Object.fromEntries(DEFAULT_TRIAGE.map((role) => [role, role])) } = {}) {
   const diagnostics = [];
   const report = (code, message, severity = 'error') => diagnostics.push({ code, message, severity });
   const metadata = {};
@@ -71,7 +71,7 @@ export function parseTicket(content, { feature, filename, strict = false, triage
   if (execution && !EXECUTIONS.has(execution)) report('invalid-execution', `Unknown execution state: ${execution}.`);
   const labels = metadata.Labels && !absent(metadata.Labels) ? metadata.Labels.split(',').map((label) => label.trim()).filter(Boolean) : [];
   if (metadata.Labels && !absent(metadata.Labels) && metadata.Labels.split(',').some((label) => !label.trim())) report('invalid-labels', 'Labels contains an empty entry.');
-  if (triage.includes(status)) labels.push(status);
+  if (triage.includes(status)) labels.push(metadata.Status);
   const commits = metadata.Commits && !absent(metadata.Commits) ? metadata.Commits.split(',').map((hash) => hash.trim()) : [];
   for (const hash of commits) if (!/^[a-f\d]{7,12}$/i.test(hash)) report('invalid-commit', `Invalid abbreviated commit hash: ${hash}.`);
   const terminal = execution || status;
@@ -96,7 +96,7 @@ export function parseTicket(content, { feature, filename, strict = false, triage
     if (!names.some((name) => headings.includes(name))) report('missing-section', `Missing section: ${names.join(' / ')}.`, strict ? 'error' : 'warning');
   }
   if (!total) report('missing-acceptance', 'No acceptance checkboxes found.', strict ? 'error' : 'warning');
-  return { id: `${feature}/${filename}`, feature, filename, number, title, status, execution,
+  return { id: `${feature}/${filename}`, feature, filename, number, title, status, execution, triageRole: Object.hasOwn(triageRoles, status) ? triageRoles[status] : null,
     labels: [...new Set(labels)], commits: [...new Set(commits)], blockers: [...new Set(blockers)],
     progress: { checked, total }, content, metadata, diagnostics };
 }
@@ -151,11 +151,15 @@ export async function loadTickets(repo, { strict = false, feature } = {}) {
   const tickets = [];
   const features = [];
   const triage = [...DEFAULT_TRIAGE];
+  const triageRoles = Object.fromEntries(DEFAULT_TRIAGE.map((role) => [role, role]));
   try {
     const config = await readFile(path.join(repo, 'docs/agents/triage-labels.md'), 'utf8');
     for (const line of config.split(/\r?\n/)) {
       const cells = line.split('|').slice(1, -1).map((cell) => cell.replace(/`/g, '').trim());
-      if (DEFAULT_TRIAGE.includes(cells[0]) && cells[1]) triage.push(cells[1].toLowerCase());
+      if (DEFAULT_TRIAGE.includes(cells[0]) && cells[1]) {
+        triage.push(cells[1].toLowerCase());
+        triageRoles[cells[1].toLowerCase()] = cells[0];
+      }
     }
   } catch (error) { if (error.code !== 'ENOENT') diagnostics.push({ severity: 'warning', code: 'triage-config', message: error.message }); }
   let root;
@@ -163,7 +167,7 @@ export async function loadTickets(repo, { strict = false, feature } = {}) {
     if ((await lstat(scratch)).isSymbolicLink()) throw new Error('.scratch cannot be a symbolic link.');
     root = await realpath(scratch);
   } catch (error) {
-    if (error.code === 'ENOENT') return { tickets, features, diagnostics };
+    if (error.code === 'ENOENT') return { tickets, features, diagnostics, triageRoles };
     throw error;
   }
   for (const directory of await readdir(root, { withFileTypes: true })) {
@@ -186,12 +190,12 @@ export async function loadTickets(repo, { strict = false, feature } = {}) {
     }
     for (const file of files) {
       if (!file.name.endsWith('.md') || (!file.isFile() && !file.isSymbolicLink())) continue;
-      try { tickets.push(parseTicket(await safeRead(root, path.join(issues, file.name)), { feature: name, filename: file.name, strict, triage })); }
+      try { tickets.push(parseTicket(await safeRead(root, path.join(issues, file.name)), { feature: name, filename: file.name, strict, triage, triageRoles })); }
       catch (error) { diagnostics.push({ severity: 'error', code: 'ticket-read', message: `${name}/${file.name}: ${error.message}` }); }
     }
   }
   tickets.sort((a, b) => a.feature.localeCompare(b.feature) || a.number - b.number || a.filename.localeCompare(b.filename));
   features.sort((a, b) => a.name.localeCompare(b.name));
   validateGraph(tickets);
-  return { tickets, features, diagnostics };
+  return { tickets, features, diagnostics, triageRoles };
 }
