@@ -55,6 +55,10 @@ async function fixture() {
   await writeFile(path.join(repo, '.scratch/feature-original/spec.md'), '# Descripción original\n\nFeature en español.');
   return repo;
 }
+async function chooseState(page, state) {
+  await page.locator('#status-summary').click();
+  await page.locator('[data-state]').filter({ hasText: state }).click();
+}
 async function digest(root) {
   const result = [];
   async function walk(directory) {
@@ -185,20 +189,22 @@ test('browser filters use label OR and status AND and navigate to blockers outsi
     await page.goto(viewer.url);
     await page.getByRole('button', { name: 'Dependent work', exact: true }).waitFor();
     assert.equal(await page.locator('#ticket-list tbody tr').count(), 6);
-    await page.locator('#state-filter').selectOption('Blocked');
+    await chooseState(page, 'Blocked');
     assert.equal(await page.locator('#ticket-list tbody tr').count(), 2);
     await page.locator('#label-summary').click();
     await page.locator('input[data-label="ops"]').check();
     assert.equal(await page.locator('#ticket-list tbody tr').count(), 1);
     await page.locator('input[data-label="backend"]').check();
     assert.equal(await page.locator('#ticket-list tbody tr').count(), 2);
-    await page.locator('#state-filter').selectOption('Ready to implement');
+    await chooseState(page, 'Ready to implement');
     assert.equal(await page.locator('#ticket-list tbody tr').count(), 2);
+    await page.locator('#label-summary').click();
     await page.locator('input[data-label="backend"]').uncheck();
     assert.equal(await page.locator('#ticket-list tbody tr').count(), 0);
     assert.equal(await page.getByText('No tickets match these filters', { exact: true }).count(), 1);
-    await page.locator('#state-filter').selectOption('Blocked');
-    await page.locator('#label-summary').click();
+    await chooseState(page, 'Blocked');
+    await page.locator('#list-title').click();
+    assert.equal(await page.locator('#label-filter').getAttribute('open'), null);
     await page.getByRole('button', { name: 'Dependent work', exact: true }).click();
     assert.equal(await page.locator('#detail .ticket-meta .state').textContent(), 'Blocked');
     assert.equal(await page.locator('#detail .acceptance-progress').textContent().then((text) => text.includes('1 / 1')), true);
@@ -213,7 +219,7 @@ test('browser filters use label OR and status AND and navigate to blockers outsi
     await page.locator('#detail .markdown a[data-ticket]').click();
     assert.equal(await page.locator('#detail .markdown h1').textContent(), '01: Diseñar página 404');
     assert.equal(await page.locator('#detail .commit-record code').textContent(), 'abc123456789');
-    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
     await page.getByRole('button', { name: 'Missing dependency', exact: true }).click();
     assert.equal(await page.locator('#detail .dependency-invalid').count(), 1);
     assert.equal(await page.locator('#detail .dependency-link[data-ticket]').count(), 0);

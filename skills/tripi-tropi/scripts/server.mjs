@@ -14,6 +14,7 @@ const staticFiles = new Map([
   ['/icon.svg', ['assets/icon.svg', 'image/svg+xml']],
   ['/vendor/marked.js', ['node_modules/marked/lib/marked.umd.js', 'text/javascript']],
   ['/vendor/purify.js', ['node_modules/dompurify/dist/purify.min.js', 'text/javascript']],
+  ['/vendor/gsap.js', ['node_modules/gsap/dist/gsap.min.js', 'text/javascript']],
 ]);
 
 export async function createViewer({ repo, port = 0, controlToken = '', thread = '', queueOptions = {} }) {

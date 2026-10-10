@@ -7,6 +7,7 @@ let selectedTicket = null;
 let loading = false;
 let selectedState = '';
 const selectedLabels = new Set();
+const filterStates = ['', 'Pending', 'Ready to implement', 'In progress', 'Blocked', 'Completed', 'Discarded', 'Unknown'];
 let workspaceKey;
 let mobileView = 'list';
 let layout = { sidebar: 220, split: 50 };
@@ -53,7 +54,7 @@ function recordCurrentScroll() { history.replaceState({ scroll: scrollPositions(
 function applyLayout() {
   const width = workspace.clientWidth;
   const sidebarMax = Math.max(160, Math.min(400, width - 510));
-  const sidebar = sidebarCollapsed ? 0 : clamp(layout.sidebar, 160, sidebarMax);
+  const sidebar = sidebarCollapsed ? 44 : clamp(layout.sidebar, 160, sidebarMax);
   const available = Math.max(0, width - sidebar - (sidebarCollapsed ? 6 : 12));
   const minimumPercent = Math.min(40, (240 / Math.max(1, available)) * 100);
   const split = clamp(layout.split, minimumPercent, 100 - minimumPercent);
@@ -68,7 +69,7 @@ function applyLayout() {
   workspace.dataset.sidebarCollapsed = String(sidebarCollapsed);
   el('toggle-sidebar').setAttribute('aria-expanded', String(!sidebarCollapsed));
   el('toggle-sidebar').setAttribute('aria-label', `${sidebarCollapsed ? 'Expand' : 'Collapse'} features sidebar`);
-  el('toggle-sidebar').textContent = sidebarCollapsed ? '›' : '‹';
+  el('toggle-sidebar').firstElementChild.textContent = sidebarCollapsed ? '›' : '‹';
 }
 function applyMobileView() {
   workspace.dataset.mobileView = mobileView;
@@ -87,7 +88,7 @@ function initializeWorkspace() {
     selectedLabels.clear(); for (const label of Array.isArray(saved.labels) ? saved.labels : []) if (typeof label === 'string') selectedLabels.add(label);
     mobileView = saved.mobileView === 'detail' ? 'detail' : 'list';
   }
-  if (![...el('state-filter').options].some((option) => option.value === selectedState)) selectedState = '';
+  if (!filterStates.includes(selectedState)) selectedState = '';
   applyLayout(); return saved;
 }
 const stateClass = (state) => ({ Completed: 'completed', 'Ready to implement': 'ready', 'In progress': 'in-progress', Blocked: 'blocked', Discarded: 'discarded', Pending: 'pending' }[state] ?? 'unknown');
@@ -107,11 +108,17 @@ const matchesFilters = (ticket) => (!selectedState || ticket.displayState === se
 function renderFilters() {
   const labels = [...new Set(snapshot.tickets.flatMap((ticket) => ticket.labels))].sort((a, b) => a.localeCompare(b));
   el('label-options').innerHTML = labels.length ? labels.map((label) => `<label class="label-option"><input type="checkbox" data-label="${escapeHTML(label)}" ${selectedLabels.has(label) ? 'checked' : ''}>${labelChip(label)}<span class="label-count">${snapshot.tickets.filter((ticket) => ticket.labels.includes(label)).length}</span></label>`).join('') : '<p class="muted">No labels available.</p>';
+  el('state-options').innerHTML = filterStates.map((state) => `<button type="button" class="status-option" data-state="${escapeHTML(state)}" aria-pressed="${state === selectedState}">${state ? stateChip(state) : 'All states'}<span class="option-check" aria-hidden="true">${state === selectedState ? '✓' : ''}</span></button>`).join('');
 }
 
 function updateFilterControls() {
   el('state-filter').value = selectedState;
-  el('label-summary').textContent = selectedLabels.size ? `Labels · ${selectedLabels.size} selected` : 'Labels · All';
+  el('label-summary').textContent = selectedLabels.size ? `${selectedLabels.size} selected` : 'All labels';
+  el('status-summary').textContent = selectedState || 'All states';
+  for (const button of el('state-options').querySelectorAll('[data-state]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.state === selectedState));
+    button.querySelector('.option-check').textContent = button.dataset.state === selectedState ? '✓' : '';
+  }
   el('clear-filters').disabled = !selectedState && !selectedLabels.size;
 }
 
@@ -229,7 +236,6 @@ function render() {
   const featureTickets = snapshot.tickets.filter((ticket) => ticket.feature === selectedFeature);
   const tickets = featureTickets.filter(matchesFilters);
   el('list-title').textContent = selectedFeature ?? 'Tickets';
-  el('list-subtitle').textContent = selectedFeature ? `${tickets.length} of ${featureTickets.length} ${featureTickets.length === 1 ? 'ticket' : 'tickets'}` : 'Choose a feature to browse its work.';
   el('ticket-count').textContent = tickets.length;
   el('ticket-list').innerHTML = tickets.length ? `<table><thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead><tbody>${tickets.map((ticket) => `<tr class="${ticket.id === selectedTicket ? 'selected' : ''}"><td class="ticket-number">${String(ticket.number ?? '?').padStart(2, '0')}</td><td><button class="ticket-link" data-ticket="${escapeHTML(ticket.id)}">${escapeHTML(ticket.title || ticket.filename)}</button><div class="row-labels">${ticket.labels.map(labelChip).join('')}</div>${ticket.commits.length ? `<div class="row-commits">${commitChips(ticket)}</div>` : ''}</td><td>${stateChip(ticket.displayState)}</td><td><span class="ticket-summary" title="${escapeHTML(summary(ticket))}">${escapeHTML(summary(ticket))}</span></td></tr>`).join('')}</tbody></table>` : `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${featureTickets.length ? 'No tickets match these filters' : selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>${featureTickets.length ? 'Change the selected labels or status, or clear the filters.' : selectedFeature ? 'Tickets will appear here when they are created.' : 'Create a feature and its tickets with to-tickets, then select Refresh.'}</p></div>`;
   const ticket = snapshot.tickets.find((item) => item.id === selectedTicket);
@@ -277,7 +283,7 @@ function normalizeSelection() {
     if (selectedTicket) mobileView = 'detail';
     selectedTicket = null;
   }
-  if (![...el('state-filter').options].some((option) => option.value === selectedState)) selectedState = '';
+  if (!filterStates.includes(selectedState)) selectedState = '';
 }
 
 function connectLive() {
@@ -335,7 +341,27 @@ el('detail').addEventListener('click', async (event) => {
   }
   render();
 });
-el('state-filter').addEventListener('change', (event) => { recordCurrentScroll(); selectedState = event.target.value; render(); writeRoute('push'); });
+el('state-options').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-state]');
+  if (!button) return;
+  recordCurrentScroll(); selectedState = button.dataset.state; el('status-filter').open = false;
+  render(); writeRoute('push'); el('status-summary').focus();
+});
+const dropdowns = [...document.querySelectorAll('.filter-dropdown')];
+for (const dropdown of dropdowns) dropdown.addEventListener('toggle', () => {
+  const options = dropdown.querySelector('.filter-options');
+  window.gsap?.killTweensOf(options);
+  if (dropdown.open && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.gsap?.fromTo(options, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.14, ease: 'power2.out', clearProps: 'opacity,transform' });
+  } else window.gsap?.set(options, { clearProps: 'opacity,transform' });
+});
+document.addEventListener('click', (event) => {
+  for (const dropdown of dropdowns) if (!dropdown.contains(event.target)) dropdown.open = false;
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  for (const dropdown of dropdowns) if (dropdown.open) { dropdown.open = false; dropdown.querySelector('summary').focus(); }
+});
 el('label-options').addEventListener('change', (event) => {
   const label = event.target.dataset.label;
   if (label === undefined) return;

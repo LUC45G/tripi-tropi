@@ -8,12 +8,12 @@
   <link rel="stylesheet" href="/style.css">
   <script src="/vendor/marked.js" defer></script>
   <script src="/vendor/purify.js" defer></script>
+  <script src="/vendor/gsap.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="tripi-tropi home"><img class="brand-mark" src="/icon.svg" alt="">tripi-tropi</a>
-    <button id="toggle-sidebar" class="refresh sidebar-toggle" type="button" aria-label="Collapse features sidebar" aria-expanded="true" aria-controls="feature-sidebar">‹</button>
     <span class="repo-name" id="repo-name">Local tickets</span>
     <span class="queue-session" id="queue-session" title="No Codex session linked">Codex: not linked</span>
     <span class="live-status" id="live-status" role="status" title="Connection for automatic updates from local files">Connecting…</span>
@@ -24,15 +24,15 @@
     <aside class="sidebar" id="feature-sidebar" aria-label="Features">
       <div class="panel-heading"><h1>Features</h1><span id="feature-count" class="count">0</span></div>
       <nav id="features" aria-label="Choose a feature"></nav>
-      <div class="sidebar-note"><span class="connection-dot" aria-hidden="true"></span>Local Markdown</div>
+      <div class="sidebar-note"><button id="toggle-sidebar" class="refresh sidebar-toggle" type="button" aria-label="Collapse features sidebar" aria-expanded="true" aria-controls="feature-sidebar"><span aria-hidden="true">‹</span></button></div>
     </aside>
     <div class="splitter" id="sidebar-splitter" role="separator" aria-label="Resize feature sidebar" aria-orientation="vertical" tabindex="0" aria-valuemin="160" aria-valuemax="400" aria-valuenow="220"></div>
     <section class="tickets-pane" aria-label="Tickets">
-      <div class="panel-heading"><div><h2 id="list-title">Tickets</h2><p id="list-subtitle">Choose a feature to browse its work.</p></div><span id="ticket-count" class="count">0</span></div>
+      <div class="panel-heading"><div><h2 id="list-title">Tickets</h2></div><span id="ticket-count" class="count">0</span></div>
       <div class="filters" aria-label="Ticket filters">
-        <label class="state-filter">Status<select id="state-filter"><option value="">All states</option><option>Pending</option><option>Ready to implement</option><option>In progress</option><option>Blocked</option><option>Completed</option><option>Discarded</option><option>Unknown</option></select></label>
-        <details class="label-filter" id="label-filter"><summary id="label-summary">Labels · All</summary><div id="label-options"></div></details>
-        <button id="clear-filters" class="clear-filters" type="button" disabled>Clear</button>
+        <div class="filter-field"><span id="status-title" class="filter-title">Status</span><details class="filter-dropdown" id="status-filter"><summary id="status-summary" aria-describedby="status-title">All states</summary><div id="state-options" class="filter-options" aria-label="Choose status"></div></details><input id="state-filter" type="hidden" value=""></div>
+        <div class="filter-field"><span id="labels-title" class="filter-title">Labels</span><details class="filter-dropdown" id="label-filter"><summary id="label-summary" aria-describedby="labels-title">All labels</summary><div id="label-options" class="filter-options" aria-label="Choose labels"></div></details></div>
+        <button id="clear-filters" class="clear-filters" type="button" disabled>Clear filters</button>
       </div>
       <div id="ticket-list" class="table-scroll"><p class="empty">Loading local tickets…</p></div>
     </section>
