@@ -69,7 +69,8 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
       if (pathname === '/api/events') return stream.subscribe(response);
       const resource = staticFiles.get(pathname);
       if (!resource) return json(404, { error: 'Resource not found.' });
-      const content = await readFile(path.join(skillRoot, resource[0]));
+      let content = await readFile(path.join(skillRoot, resource[0]));
+      if (pathname === '/') content = Buffer.from(content.toString().replace('>version</span>', `>v${skillVersion}</span>`));
       response.writeHead(200, { 'Content-Type': `${resource[1]}; charset=utf-8` });
       response.end(content);
     } catch (error) { json(500, { error: error.message }); }
