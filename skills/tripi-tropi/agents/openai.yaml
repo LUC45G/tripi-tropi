@@ -1,0 +1,4 @@
+interface:
+  display_name: "tripi-tropi"
+  short_description: "Browse local tickets in a read-only web viewer"
+  default_prompt: "Use $tripi-tropi to open the local ticket viewer for this repository while continuing my current work."

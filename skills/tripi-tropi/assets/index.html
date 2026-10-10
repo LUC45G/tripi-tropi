@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tripi-tropi · Local tickets</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/vendor/marked.js" defer></script>
+  <script src="/vendor/purify.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="tripi-tropi home"><span class="brand-mark" aria-hidden="true">tt</span>tripi-tropi</a>
+    <span class="repo-name" id="repo-name">Local tickets</span>
+    <span class="read-only">Read-only</span>
+    <button class="refresh" id="refresh" type="button">Refresh</button>
+  </header>
+  <div id="error" role="alert" hidden></div>
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Features">
+      <div class="panel-heading"><h1>Features</h1><span id="feature-count" class="count">0</span></div>
+      <nav id="features" aria-label="Choose a feature"></nav>
+      <div class="sidebar-note"><span class="connection-dot" aria-hidden="true"></span>Local Markdown<span>Changes appear after Refresh.</span></div>
+    </aside>
+    <section class="tickets-pane" aria-label="Tickets">
+      <div class="panel-heading"><div><h2 id="list-title">Tickets</h2><p id="list-subtitle">Choose a feature to browse its work.</p></div><span id="ticket-count" class="count">0</span></div>
+      <div id="ticket-list" class="table-scroll"><p class="empty">Loading local tickets…</p></div>
+    </section>
+    <section class="detail-pane" aria-label="Selected detail" tabindex="-1">
+      <div class="detail-toolbar"><span id="detail-kind">Overview</span><span id="detail-path"></span></div>
+      <div id="detail" class="detail-content"><p class="empty">Select a feature or ticket to read its description.</p></div>
+    </section>
+  </main>
+</body>
+</html>

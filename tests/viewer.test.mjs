@@ -1,0 +1,165 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { chromium } from 'playwright';
+import { createViewer } from '../skills/tripi-tropi/scripts/server.mjs';
+
+const browserPath = process.env.TRIPI_TROPI_BROWSER ?? (process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : '');
+const browserAvailable = browserPath && existsSync(browserPath);
+const content = `# 01: Diseñar página 404
+Status: ready-for-agent
+Execution: completed
+Labels: design
+Blocked by: none
+Commits: abc123456789
+
+## Estado inicial
+### Qué construir
+Conservar el contenido original en español.
+### Atomicidad
+Resultado completo.
+### Criterios de aceptación
+- [x] Verificar el diseño
+## Trabajo realizado
+Código y pruebas.
+## Estado posterior
+Completado.
+
+| Name | Result |
+| --- | --- |
+| Markdown | Preserved |
+
+\`\`\`js
+const original = 'sin traducir';
+\`\`\`
+
+> Texto citado.
+
+[Official documentation](https://example.com)
+<img src=x onerror="window.ticketAttack=true">
+<script>window.ticketAttack=true</script>
+[Attack](javascript:alert(1))
+<input type=text value=editable>
+`;
+
+async function fixture() {
+  const repo = await mkdtemp(path.join(tmpdir(), 'tripi-tropi-viewer-'));
+  const issues = path.join(repo, '.scratch/feature-original/issues');
+  await mkdir(issues, { recursive: true });
+  await writeFile(path.join(issues, '01-original.md'), content);
+  await writeFile(path.join(repo, '.scratch/feature-original/spec.md'), '# Descripción original\n\nFeature en español.');
+  return repo;
+}
+async function digest(root) {
+  const result = [];
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const filename = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(filename);
+      else result.push([path.relative(root, filename), createHash('sha256').update(await readFile(filename)).digest('hex')]);
+    }
+  }
+  await walk(root); return result.sort(([a], [b]) => a.localeCompare(b));
+}
+function command(args, env = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ['skills/tripi-tropi/scripts/launch.mjs', ...args], { env: { ...process.env, ...env }, windowsHide: true });
+    let stdout = ''; let stderr = '';
+    child.stdout.on('data', (data) => { stdout += data; }); child.stderr.on('data', (data) => { stderr += data; });
+    child.once('error', reject); child.once('close', (code) => resolve({ code, stdout, stderr }));
+  });
+}
+
+test('HTTP viewer isolates repositories and rejects write requests, traversal and foreign origins', async () => {
+  const repo = await fixture();
+  const empty = await mkdtemp(path.join(tmpdir(), 'tripi-tropi-empty-'));
+  const before = await digest(repo);
+  const first = await createViewer({ repo });
+  const second = await createViewer({ repo: empty });
+  try {
+    const snapshot = await (await fetch(`${first.url}/api/snapshot`)).json();
+    assert.equal(snapshot.tickets[0].title, 'Diseñar página 404');
+    assert.deepEqual(snapshot.tickets[0].commits, ['abc123456789']);
+    assert.equal(snapshot.features[0].descriptionFile, 'spec.md');
+    assert.equal((await (await fetch(`${second.url}/api/snapshot`)).json()).tickets.length, 0);
+    for (const resource of ['/', '/app.js', '/style.css', '/vendor/marked.js', '/vendor/purify.js']) assert.equal((await fetch(`${first.url}${resource}`)).status, 200);
+    assert.equal((await fetch(`${first.url}/api/snapshot`, { method: 'POST', body: 'Execution: completed' })).status, 405);
+    assert.equal((await fetch(`${first.url}/api/snapshot`, { headers: { Origin: 'http://malicious.example' } })).status, 403);
+    assert.equal((await fetch(`${first.url}/control/stop`, { method: 'POST' })).status, 403);
+    assert.equal((await fetch(`${first.url}/..%2f..%2fpackage.json`)).status, 404);
+    assert.deepEqual(await digest(repo), before);
+  } finally {
+    await Promise.all([first, second].map(({ server }) => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); })));
+    await rm(repo, { recursive: true, force: true }); await rm(empty, { recursive: true, force: true });
+  }
+});
+
+test('browser renders original Markdown and hashes, with inert checkboxes and sanitized content', { skip: !browserAvailable }, async () => {
+  const repo = await fixture();
+  const before = await digest(repo);
+  const viewer = await createViewer({ repo });
+  const browser = await chromium.launch({ executablePath: browserPath, headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    const failures = [];
+    page.on('pageerror', (error) => failures.push(error.message));
+    await page.goto(viewer.url);
+    await page.getByRole('button', { name: 'Diseñar página 404' }).waitFor();
+    assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+    assert.equal(await page.locator('#detail .markdown h1').textContent(), 'Descripción original');
+    await page.getByRole('button', { name: 'Diseñar página 404' }).click();
+    assert.equal(await page.locator('#detail .markdown h1').textContent(), '01: Diseñar página 404');
+    assert.equal(await page.locator('#detail .commit-record code').textContent(), 'abc123456789');
+    assert.equal(await page.locator('#detail .markdown table td').first().textContent(), 'Markdown');
+    assert.ok((await page.locator('#detail pre').textContent()).includes('sin traducir'));
+    assert.equal(await page.locator('#detail .markdown input[type=checkbox]').isDisabled(), true);
+    assert.equal(await page.locator('#detail input[type=text]').count(), 0);
+    assert.equal(await page.locator('#detail script, #detail [onerror], #detail a[href^="javascript:"]').count(), 0);
+    assert.equal(await page.evaluate(() => window.ticketAttack), undefined);
+    assert.equal(await page.locator('#detail a[href="https://example.com"]').getAttribute('rel'), 'noopener noreferrer');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight), false);
+    await mkdir('.cache', { recursive: true });
+    await page.screenshot({ path: '.cache/tripi-tropi-desktop.png', fullPage: true });
+    // External change is visible through explicit Refresh in ticket 02.
+    await writeFile(path.join(repo, '.scratch/feature-original/issues/01-original.md'), content.replace('abc123456789', 'def123456789'));
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.locator('#detail .commit-record code').filter({ hasText: 'def123456789' }).waitFor();
+    await writeFile(path.join(repo, '.scratch/feature-original/issues/01-original.md'), content);
+    assert.deepEqual(await digest(repo), before);
+    assert.deepEqual(failures, []);
+  } finally {
+    await browser.close(); await new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('detached launcher reuses same repo, separates another repo and stops only its own instance', { timeout: 30000 }, async () => {
+  const first = await fixture();
+  const second = await fixture();
+  try {
+    const started = await command(['--repo', first, '--no-open']);
+    assert.equal(started.code, 0, started.stderr);
+    const a = JSON.parse(started.stdout);
+    assert.equal(a.reused, false);
+    const reused = await command(['--repo', first, '--no-open']);
+    assert.equal(reused.code, 0, reused.stderr);
+    const b = JSON.parse(reused.stdout);
+    assert.equal(b.reused, true); assert.equal(b.pid, a.pid); assert.equal(b.url, a.url);
+    const other = await command(['--repo', second, '--no-open']);
+    assert.equal(other.code, 0, other.stderr);
+    assert.notEqual(JSON.parse(other.stdout).url, a.url);
+    assert.equal((await fetch(`${a.url}/api/health`)).status, 200);
+    const stopped = await command(['--repo', first, '--stop']);
+    assert.equal(stopped.code, 0, stopped.stderr);
+    assert.equal((await fetch(`${JSON.parse(other.stdout).url}/api/health`)).status, 200);
+  } finally {
+    await command(['--repo', first, '--stop']); await command(['--repo', second, '--stop']);
+    await rm(first, { recursive: true, force: true }); await rm(second, { recursive: true, force: true });
+  }
+});
