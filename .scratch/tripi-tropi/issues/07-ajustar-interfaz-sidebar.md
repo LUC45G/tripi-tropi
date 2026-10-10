@@ -1,9 +1,9 @@
 # 07: Ajustar identidad visual y colapsar la sidebar
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: viewer, design
 Blocked by: 04
-Commits: none
+Commits: 21d5ec8d3520
 
 ## Estado inicial
 
@@ -24,4 +24,4 @@ Entrega completa de presentación y navegación de la sidebar, después del 04, 
 Marca SVG compartida con favicon, textos eliminados y cursores de resize según orientación. Botón accesible con aria-expanded para colapsar/expandir la sidebar, preferencia por repositorio y ancho conservado. Live tiene descripción de su conexión para actualizaciones automáticas. Pruebas de navegador verifican identidad, ausencia de textos, cursores, colapso, recarga y restauración de ancho; las pruebas en vivo siguen pasando.
 
 ## Estado posterior
-Implementación verificada; pendiente registrar hash real y cierre. Los cambios corresponden solo al 07; el 05 se implementará después.
+Completado y verificado. Implementación 21d5ec8d3520; hash registrado en este cierre separado. Los cambios corresponden solo al 07; el 05 se implementará después.
