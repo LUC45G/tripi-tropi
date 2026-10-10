@@ -1,6 +1,6 @@
 # tripi-tropi
 
-A local, read-only ticket viewer for `.scratch/<feature>/issues/*.md`. It runs independently while your agent works. Node.js 24+ with npm and registry access are required; Codex CLI with `queue` support is optional for sending implementation requests.
+A local, read-only ticket viewer for `.scratch/<feature>/issues/*.md` created with the `to-tickets` skill. Install or otherwise make `to-tickets` available in the repository if you want to create and maintain tickets; the viewer itself only reads existing Markdown files. It runs independently while your agent works. Node.js 24+ with npm and registry access are required; Codex CLI with `queue` support is optional for sending implementation requests.
 
 ## Install
 
@@ -13,16 +13,16 @@ node scripts/install-skill.mjs
 This installs the complete skill and locked runtime dependencies into `~/.agents/skills/tripi-tropi`. No build or developer dependencies are required. For another destination, pass the **parent skills directory**:
 
 ```sh
-node scripts/install-skill.mjs --skills-dir "C:/Users/lucas/custom skills"
+node scripts/install-skill.mjs --skills-dir "<your skills directory>"
 ```
 
-To obtain the checkout first: `git clone git@github.com:LUC45G/tripi-tropi.git`, then `cd tripi-tropi`. Use `git checkout <commit-or-tag>` before installation to select a reproducible source version. The dependency versions and integrity hashes come from the bundled lockfile; the developer's `node_modules` is never copied.
+To obtain the checkout first, clone the repository using the HTTPS or SSH URL available to you, then `cd tripi-tropi`. Use `git checkout <commit-or-tag>` before installation to select a reproducible source version. The dependency versions and integrity hashes come from the bundled lockfile; the developer's `node_modules` is never copied.
 
 The installer leaves existing installations untouched unless `--update` is supplied. It builds and verifies a staged package before activation. Failed dependency installation preserves the previous version. It never edits Codex configuration or other skills. An existing unmanaged directory or symlink must be preserved or moved manually; choose another destination instead of overwriting it.
 
 ## Discover and run
 
-Invoke `$tripi-tropi` in Codex and ask it to open tickets in your current repository. Codex discovers user skills in `~/.agents/skills` automatically; if it does not appear, restart Codex. A custom directory must be a supported discovery location (for example `<repo>/.agents/skills`) or launched directly. See the [official Codex skill documentation](https://learn.chatgpt.com/docs/build-skills).
+Invoke `$tripi-tropi` in Codex and ask it to open tickets in your current repository. The viewer works even when `tripi-tropi` is not explicitly invoked: launch its script directly, or invoke another agent workflow that starts it. `to-tickets` is only needed for the ticket authoring workflow; it is not required to display existing tickets. Codex discovers user skills in `~/.agents/skills` automatically; if it does not appear, restart Codex. A custom directory must be a supported discovery location (for example `<repo>/.agents/skills`) or launched directly. See the [official Codex skill documentation](https://learn.chatgpt.com/docs/build-skills).
 
 Direct launch from any working directory (replace the example skill path with your installation path):
 
