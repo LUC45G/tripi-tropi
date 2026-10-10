@@ -7,6 +7,82 @@ let selectedTicket = null;
 let loading = false;
 let selectedState = '';
 const selectedLabels = new Set();
+let workspaceKey;
+let mobileView = 'list';
+let layout = { sidebar: 220, split: 50 };
+let storageTimer;
+let eventSource;
+const workspace = document.querySelector('.workspace');
+const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+
+function scrollPositions() {
+  return { detail: el('detail').scrollTop, list: el('ticket-list').scrollTop, features: el('features').scrollTop };
+}
+function restoreScroll(scroll = {}) {
+  el('detail').scrollTop = scroll.detail ?? 0;
+  el('ticket-list').scrollTop = scroll.list ?? 0;
+  el('features').scrollTop = scroll.features ?? 0;
+}
+function savedWorkspace() {
+  try { return JSON.parse(localStorage.getItem(workspaceKey)) ?? {}; } catch { return {}; }
+}
+function persistWorkspace() {
+  if (!workspaceKey) return;
+  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, layout, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
+}
+function readRoute() {
+  const params = new URLSearchParams(location.search);
+  selectedFeature = params.get('feature'); selectedTicket = params.get('ticket');
+  selectedState = params.get('state') ?? '';
+  selectedLabels.clear(); for (const label of params.getAll('label')) selectedLabels.add(label);
+  mobileView = params.get('view') === 'detail' ? 'detail' : 'list';
+}
+function writeRoute(method = 'replace') {
+  const params = new URLSearchParams();
+  if (selectedFeature) params.set('feature', selectedFeature);
+  if (selectedTicket) params.set('ticket', selectedTicket);
+  if (selectedState) params.set('state', selectedState);
+  for (const label of selectedLabels) params.append('label', label);
+  if (mobileView === 'detail') params.set('view', 'detail');
+  history[`${method}State`]({ scroll: scrollPositions() }, '', `${location.pathname}${params.size ? `?${params}` : ''}`);
+  persistWorkspace();
+}
+function recordCurrentScroll() { history.replaceState({ scroll: scrollPositions() }, '', location.href); }
+function applyLayout() {
+  const width = workspace.clientWidth;
+  const sidebarMax = Math.max(160, Math.min(400, width - 510));
+  const sidebar = clamp(layout.sidebar, 160, sidebarMax);
+  const available = Math.max(0, width - sidebar - 12);
+  const minimumPercent = Math.min(40, (240 / Math.max(1, available)) * 100);
+  const split = clamp(layout.split, minimumPercent, 100 - minimumPercent);
+  workspace.style.setProperty('--sidebar-size', `${sidebar}px`);
+  workspace.style.setProperty('--ticket-share', `${split}fr`);
+  workspace.style.setProperty('--detail-share', `${100 - split}fr`);
+  el('sidebar-splitter').setAttribute('aria-valuemax', String(Math.round(sidebarMax)));
+  el('sidebar-splitter').setAttribute('aria-valuenow', String(Math.round(sidebar)));
+  el('detail-splitter').setAttribute('aria-valuemin', String(Math.round(minimumPercent)));
+  el('detail-splitter').setAttribute('aria-valuemax', String(Math.round(100 - minimumPercent)));
+  el('detail-splitter').setAttribute('aria-valuenow', String(Math.round(split)));
+}
+function applyMobileView() {
+  workspace.dataset.mobileView = mobileView;
+  for (const button of document.querySelectorAll('[data-mobile-view]')) button.setAttribute('aria-pressed', String(button.dataset.mobileView === mobileView));
+}
+function initializeWorkspace() {
+  workspaceKey = `tripi-tropi:${snapshot.repo}`;
+  const saved = savedWorkspace();
+  if (Number.isFinite(saved.layout?.sidebar) && Number.isFinite(saved.layout?.split)) layout = saved.layout;
+  if (location.search) readRoute();
+  else {
+    selectedFeature = typeof saved.feature === 'string' ? saved.feature : null;
+    selectedTicket = typeof saved.ticket === 'string' ? saved.ticket : null;
+    selectedState = typeof saved.state === 'string' ? saved.state : '';
+    selectedLabels.clear(); for (const label of Array.isArray(saved.labels) ? saved.labels : []) if (typeof label === 'string') selectedLabels.add(label);
+    mobileView = saved.mobileView === 'detail' ? 'detail' : 'list';
+  }
+  if (![...el('state-filter').options].some((option) => option.value === selectedState)) selectedState = '';
+  applyLayout(); return saved;
+}
 const stateClass = (state) => ({ Completed: 'completed', 'Ready to implement': 'ready', 'In progress': 'in-progress', Blocked: 'blocked', Discarded: 'discarded', Pending: 'pending' }[state] ?? 'unknown');
 const stateChip = (state) => `<span class="state ${stateClass(state)}">${escapeHTML(state)}</span>`;
 const commitChips = (ticket) => ticket.commits.length ? ticket.commits.map((hash) => `<code class="commit" title="Implementation commit">${escapeHTML(hash)}</code>`).join(' ') : '<span class="muted">No commits recorded</span>';
@@ -44,8 +120,9 @@ function dependencyList(ticket) {
 function navigateTicket(id) {
   const ticket = snapshot.tickets.find((item) => item.id === id);
   if (!ticket) return;
-  selectedFeature = ticket.feature; selectedTicket = ticket.id; render();
-  document.querySelector('.detail-content').scrollTop = 0;
+  recordCurrentScroll();
+  selectedFeature = ticket.feature; selectedTicket = ticket.id; mobileView = 'detail'; render();
+  el('detail').scrollTop = 0; writeRoute('push');
 }
 
 function markdown(content) {
@@ -109,6 +186,8 @@ function diagnostics(items) {
 }
 
 function render() {
+  const scroll = scrollPositions();
+  const openDiagnostics = el('detail').querySelector('.diagnostics')?.open;
   updateFilterControls();
   el('repo-name').textContent = snapshot.repoName ?? 'Local tickets';
   el('repo-name').title = snapshot.repo ?? '';
@@ -141,6 +220,45 @@ function render() {
     el('detail-kind').textContent = 'Overview'; el('detail-path').textContent = '';
     el('detail').innerHTML = `${diagnostics(snapshot.diagnostics)}<div class="empty-state"><h3>Your local ticket desk</h3><p>Select a feature to see its summary, then select a ticket to read the full Markdown.</p><p class="muted">Files stay untouched. The viewer only reads.</p></div>`;
   }
+  if (openDiagnostics !== undefined && el('detail').querySelector('.diagnostics')) el('detail').querySelector('.diagnostics').open = openDiagnostics;
+  restoreScroll(scroll); applyMobileView();
+}
+
+function applySnapshot(data) {
+  if (data.instance === snapshot.instance && data.revision < snapshot.revision) return;
+  const focused = document.activeElement;
+  const focusKey = focused?.dataset.label !== undefined ? ['data-label', focused.dataset.label] : focused?.dataset.ticket ? ['data-ticket', focused.dataset.ticket] : focused?.dataset.feature ? ['data-feature', focused.dataset.feature] : null;
+  const first = !workspaceKey;
+  snapshot = data;
+  const saved = first ? initializeWorkspace() : null;
+  normalizeSelection();
+  el('error').hidden = true; renderFilters(); render();
+  if (first && saved?.scroll && saved.ticket === selectedTicket && saved.feature === selectedFeature) restoreScroll(saved.scroll);
+  if (focusKey) document.querySelector(`[${focusKey[0]}="${CSS.escape(focusKey[1])}"]`)?.focus({ preventScroll: true });
+  writeRoute();
+}
+
+function normalizeSelection() {
+  const ticket = snapshot.tickets.find((item) => item.id === selectedTicket);
+  if (ticket && !selectedFeature) selectedFeature = ticket.feature;
+  if (!snapshot.features.some((item) => item.name === selectedFeature)) selectedFeature = snapshot.features[0]?.name ?? null;
+  if (!ticket || ticket.feature !== selectedFeature) {
+    if (selectedTicket) mobileView = 'detail';
+    selectedTicket = null;
+  }
+  if (![...el('state-filter').options].some((option) => option.value === selectedState)) selectedState = '';
+}
+
+function connectLive() {
+  eventSource = new EventSource('/api/events');
+  eventSource.onopen = () => { el('live-status').textContent = 'Live'; el('live-status').dataset.connection = 'live'; };
+  eventSource.onerror = () => { el('live-status').textContent = 'Reconnecting…'; el('live-status').dataset.connection = 'offline'; };
+  eventSource.addEventListener('snapshot', (event) => {
+    try { applySnapshot(JSON.parse(event.data)); } catch (error) { el('error').textContent = `Could not display updates. ${error.message}`; el('error').hidden = false; }
+  });
+  eventSource.addEventListener('read-error', (event) => {
+    el('error').textContent = `Could not read updates. ${JSON.parse(event.data).error}`; el('error').hidden = false;
+  });
 }
 
 async function refresh() {
@@ -150,10 +268,7 @@ async function refresh() {
     const response = await fetch('/api/snapshot');
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? 'Could not read local tickets.');
-    snapshot = data;
-    if (!snapshot.features.some((item) => item.name === selectedFeature)) selectedFeature = snapshot.features[0]?.name ?? null;
-    if (!snapshot.tickets.some((item) => item.id === selectedTicket && item.feature === selectedFeature)) selectedTicket = null;
-    el('error').hidden = true; renderFilters(); render();
+    applySnapshot(data);
   } catch (error) { el('error').textContent = `Could not refresh tickets. ${error.message}`; el('error').hidden = false; }
   finally { loading = false; el('refresh').disabled = false; el('refresh').textContent = 'Refresh'; }
 }
@@ -161,7 +276,7 @@ async function refresh() {
 el('features').addEventListener('click', (event) => {
   const button = event.target.closest('[data-feature]');
   if (!button) return;
-  selectedFeature = button.dataset.feature; selectedTicket = null; render();
+  recordCurrentScroll(); selectedFeature = button.dataset.feature; selectedTicket = null; mobileView = 'detail'; render(); el('detail').scrollTop = 0; writeRoute('push');
 });
 el('ticket-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-ticket]');
@@ -175,15 +290,57 @@ el('detail').addEventListener('click', (event) => {
   if (!link) return;
   event.preventDefault(); navigateTicket(link.dataset.ticket);
 });
-el('state-filter').addEventListener('change', (event) => { selectedState = event.target.value; render(); });
+el('state-filter').addEventListener('change', (event) => { recordCurrentScroll(); selectedState = event.target.value; render(); writeRoute('push'); });
 el('label-options').addEventListener('change', (event) => {
   const label = event.target.dataset.label;
   if (label === undefined) return;
-  if (event.target.checked) selectedLabels.add(label); else selectedLabels.delete(label);
-  render();
+  recordCurrentScroll(); if (event.target.checked) selectedLabels.add(label); else selectedLabels.delete(label);
+  render(); writeRoute('push');
 });
 el('clear-filters').addEventListener('click', () => {
-  selectedLabels.clear(); selectedState = ''; renderFilters(); render();
+  recordCurrentScroll(); selectedLabels.clear(); selectedState = ''; renderFilters(); render(); writeRoute('push');
 });
 el('refresh').addEventListener('click', refresh);
-refresh();
+for (const pane of [el('detail'), el('ticket-list'), el('features')]) pane.addEventListener('scroll', () => {
+  clearTimeout(storageTimer); storageTimer = setTimeout(() => { persistWorkspace(); recordCurrentScroll(); }, 150);
+}, { passive: true });
+window.addEventListener('popstate', (event) => { readRoute(); normalizeSelection(); renderFilters(); render(); restoreScroll(event.state?.scroll); persistWorkspace(); });
+document.querySelector('.mobile-tabs').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-mobile-view]');
+  if (!button) return;
+  recordCurrentScroll(); mobileView = button.dataset.mobileView; applyMobileView(); writeRoute('push');
+});
+for (const [id, kind] of [['sidebar-splitter', 'sidebar'], ['detail-splitter', 'split']]) {
+  const splitter = el(id);
+  splitter.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    splitter.setPointerCapture(event.pointerId); splitter.dataset.dragging = 'true';
+    workspace.classList.add('resizing'); event.preventDefault();
+  });
+  splitter.addEventListener('pointermove', (event) => {
+    if (!splitter.hasPointerCapture(event.pointerId)) return;
+    const offset = event.clientX - workspace.getBoundingClientRect().left;
+    if (kind === 'sidebar') layout.sidebar = clamp(offset, 160, Number(splitter.getAttribute('aria-valuemax')));
+    else {
+      const sidebar = document.querySelector('.sidebar').getBoundingClientRect().width;
+      const available = workspace.clientWidth - sidebar - 12;
+      layout.split = clamp((offset - sidebar - 6) / available * 100, Number(splitter.getAttribute('aria-valuemin')), Number(splitter.getAttribute('aria-valuemax')));
+    }
+    applyLayout();
+  });
+  const finish = () => { delete splitter.dataset.dragging; workspace.classList.remove('resizing'); persistWorkspace(); };
+  splitter.addEventListener('lostpointercapture', finish);
+  splitter.addEventListener('keydown', (event) => {
+    const min = Number(splitter.getAttribute('aria-valuemin')); const max = Number(splitter.getAttribute('aria-valuemax'));
+    const step = kind === 'sidebar' ? 16 : 3;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const current = Number(splitter.getAttribute('aria-valuenow'));
+    layout[kind] = event.key === 'Home' ? min : event.key === 'End' ? max : clamp(current + (event.key === 'ArrowLeft' ? -step : step), min, max);
+    applyLayout(); persistWorkspace();
+  });
+}
+window.addEventListener('resize', applyLayout);
+window.addEventListener('pagehide', () => { persistWorkspace(); eventSource?.close(); });
+window.addEventListener('pageshow', () => { if (eventSource?.readyState === EventSource.CLOSED) connectLive(); });
+refresh().finally(connectLive);

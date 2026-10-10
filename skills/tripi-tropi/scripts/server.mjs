@@ -3,14 +3,14 @@ import path from 'node:path';
 import { readFile, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { timingSafeEqual } from 'node:crypto';
-import { loadTickets } from './tickets.mjs';
-import { deriveTicketStates } from './ticket-states.mjs';
+import { createSnapshotStream } from './snapshot-stream.mjs';
 
 const skillRoot = fileURLToPath(new URL('../', import.meta.url));
 const staticFiles = new Map([
   ['/', ['assets/index.html', 'text/html']],
   ['/app.js', ['assets/app.js', 'text/javascript']],
   ['/style.css', ['assets/style.css', 'text/css']],
+  ['/icon.svg', ['assets/icon.svg', 'image/svg+xml']],
   ['/vendor/marked.js', ['node_modules/marked/lib/marked.umd.js', 'text/javascript']],
   ['/vendor/purify.js', ['node_modules/dompurify/dist/purify.min.js', 'text/javascript']],
 ]);
@@ -19,6 +19,7 @@ export async function createViewer({ repo, port = 0, controlToken = '' }) {
   const root = await realpath(path.resolve(repo));
   // Fail before launch succeeds if bundled assets or installed dependencies are missing.
   await Promise.all([...staticFiles.values()].map(([filename]) => readFile(path.join(skillRoot, filename))));
+  const stream = await createSnapshotStream(root);
   const server = http.createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -42,10 +43,8 @@ export async function createViewer({ repo, port = 0, controlToken = '' }) {
     if (request.method !== 'GET') return json(405, { error: 'This viewer is read-only.' });
     try {
       if (pathname === '/api/health') return json(200, { app: 'tripi-tropi', version: 1, repo: root, pid: process.pid });
-      if (pathname === '/api/snapshot') {
-        const data = await loadTickets(root);
-        return json(200, { ...data, repo: root, repoName: path.basename(root), tickets: deriveTicketStates(data.tickets) });
-      }
+      if (pathname === '/api/snapshot') return json(200, stream.snapshot());
+      if (pathname === '/api/events') return stream.subscribe(response);
       const resource = staticFiles.get(pathname);
       if (!resource) return json(404, { error: 'Resource not found.' });
       const content = await readFile(path.join(skillRoot, resource[0]));
@@ -53,10 +52,11 @@ export async function createViewer({ repo, port = 0, controlToken = '' }) {
       response.end(content);
     } catch (error) { json(500, { error: error.message }); }
   });
-  await new Promise((resolve, reject) => {
+  server.once('close', () => { stream.close().catch((error) => console.error(error.message)); });
+  try { await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
-  });
+  }); } catch (error) { await stream.close(); throw error; }
   return { server, repo: root, url: `http://127.0.0.1:${server.address().port}` };
 }
 

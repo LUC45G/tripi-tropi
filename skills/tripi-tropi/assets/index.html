@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tripi-tropi · Local tickets</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="stylesheet" href="/style.css">
   <script src="/vendor/marked.js" defer></script>
   <script src="/vendor/purify.js" defer></script>
@@ -13,6 +14,7 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="tripi-tropi home"><span class="brand-mark" aria-hidden="true">tt</span>tripi-tropi</a>
     <span class="repo-name" id="repo-name">Local tickets</span>
+    <span class="live-status" id="live-status" role="status">Connecting…</span>
     <span class="read-only">Read-only</span>
     <button class="refresh" id="refresh" type="button">Refresh</button>
   </header>
@@ -21,8 +23,9 @@
     <aside class="sidebar" aria-label="Features">
       <div class="panel-heading"><h1>Features</h1><span id="feature-count" class="count">0</span></div>
       <nav id="features" aria-label="Choose a feature"></nav>
-      <div class="sidebar-note"><span class="connection-dot" aria-hidden="true"></span>Local Markdown<span>Changes appear after Refresh.</span></div>
+      <div class="sidebar-note"><span class="connection-dot" aria-hidden="true"></span>Local Markdown<span>Updates automatically when files change.</span></div>
     </aside>
+    <div class="splitter" id="sidebar-splitter" role="separator" aria-label="Resize feature sidebar" aria-orientation="vertical" tabindex="0" aria-valuemin="160" aria-valuemax="400" aria-valuenow="220"></div>
     <section class="tickets-pane" aria-label="Tickets">
       <div class="panel-heading"><div><h2 id="list-title">Tickets</h2><p id="list-subtitle">Choose a feature to browse its work.</p></div><span id="ticket-count" class="count">0</span></div>
       <div class="filters" aria-label="Ticket filters">
@@ -32,10 +35,12 @@
       </div>
       <div id="ticket-list" class="table-scroll"><p class="empty">Loading local tickets…</p></div>
     </section>
+    <div class="splitter" id="detail-splitter" role="separator" aria-label="Resize ticket and detail panels" aria-orientation="vertical" tabindex="0" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50"></div>
     <section class="detail-pane" aria-label="Selected detail" tabindex="-1">
       <div class="detail-toolbar"><span id="detail-kind">Overview</span><span id="detail-path"></span></div>
       <div id="detail" class="detail-content"><p class="empty">Select a feature or ticket to read its description.</p></div>
     </section>
   </main>
+  <nav class="mobile-tabs" aria-label="Workspace view"><button type="button" data-mobile-view="list" aria-pressed="true">Tickets</button><button type="button" data-mobile-view="detail" aria-pressed="false">Detail</button></nav>
 </body>
 </html>
