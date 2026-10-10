@@ -25,6 +25,8 @@ Entrega completa de presentación y navegación de la sidebar, después del 04, 
 - [x] Explorar Annnimate e instalar su base GSAP para probar movimiento discreto compatible con reduced motion.
 - [x] Usar 1337 como referencia para fondos y botones, conservando colores de labels y estados.
 - [x] Presentar metadatos del ticket en tabla de título/valores sin bordes, con Queue implementation y su explicación juntos arriba.
+- [x] Botón de colapso ocupa todo el ancho disponible del pie y article.markdown ocupa todo el ancho del detalle.
+- [x] Mostrar Codex: nombre de sesión - ID, con ID muted y fallback cuando no haya nombre disponible.
 - [ ] Mantener el ticket abierto hasta la conformidad explícita del usuario con la UI.
 
 ## Trabajo realizado
@@ -37,6 +39,8 @@ Colores de superficies y botones basados en el 1337 original de MarkMichos/1337-
 Verificación: 23 pruebas pasan, incluyendo clic exterior, títulos de filtros, cantidades no duplicadas, botón en el pie, colapso persistente y reduced motion. La sesión Codex vinculada se verificó en navegador tras reiniciar el servidor anterior; desapareció Codex: unavailable. El ticket permanece in-progress por pedido explícito del usuario hasta su conformidad con la UI.
 
 Tercera entrega: encabezado del detalle organizado en tabla semántica de título/valores sin bordes, con filas Status, Triage, Labels, Acceptance criteria, Commits y Dependencies. Queue implementation y su explicación aparecen juntos arriba. Los metadatos reconocidos antes de las secciones se presentan en esa tabla y no se duplican como texto suelto en el Markdown renderizado; título, prosa y ejemplos dentro de fences conservan su contenido. Los archivos originales no se modifican. Se verificó visualmente con el ticket 06 sin encolarlo; las 23 pruebas siguen pasando, incluidas ausencia de bordes y de metadatos duplicados.
+
+Cuarta entrega: botón de colapso al 100% del ancho disponible del pie y Markdown al 100% de la columna, sin máximo de 76ch. Codex muestra nombre de sesión seguido del ID muted. El servidor consulta únicamente metadatos del índice local de sesiones, de forma opcional y de solo lectura; admite líneas incompletas o un índice ausente sin afectar el visor y no cambia el destino de envío. Si no hay nombre, muestra Unnamed session. Texto insertado como contenido seguro, sin interpretar HTML. Nombre real verificado: Set up Matt Pocock skills. Verificación visual de anchos y 24 pruebas Node/Edge pasan; el 07 permanece abierto para conformidad del usuario.
 
 ## Estado posterior
 Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c y 6458e758c733. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.

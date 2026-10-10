@@ -243,8 +243,13 @@ async function loadQueue() {
     const response = await fetch('/api/queue');
     if (!response.ok) throw new Error('Could not read linked session.');
     queueInfo = await response.json();
-    el('queue-session').textContent = queueInfo.thread ? `Codex: ${queueInfo.thread}` : 'Codex: not linked';
-    el('queue-session').title = queueInfo.thread ? `Queue destination: ${queueInfo.thread}` : 'No Codex session linked';
+    el('queue-session').replaceChildren();
+    if (queueInfo.thread) {
+      el('queue-session').append(document.createTextNode(`Codex: ${queueInfo.threadName || 'Unnamed session'} - `));
+      const id = document.createElement('span'); id.className = 'session-id'; id.textContent = queueInfo.thread;
+      el('queue-session').append(id);
+    } else el('queue-session').textContent = 'Codex: not linked';
+    el('queue-session').title = queueInfo.thread ? `Queue destination: ${queueInfo.threadName || 'Unnamed session'} - ${queueInfo.thread}` : 'No Codex session linked';
   } catch {
     queueInfo = { thread: null, token: '', records: {} };
     el('queue-session').textContent = 'Codex: unavailable';

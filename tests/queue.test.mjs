@@ -10,6 +10,7 @@ import { chromium } from 'playwright';
 import { createQueue, queueMessage } from '../skills/tripi-tropi/scripts/queue.mjs';
 import { createViewer } from '../skills/tripi-tropi/scripts/server.mjs';
 import { loadTickets } from '../skills/tripi-tropi/scripts/tickets.mjs';
+import { readThreadName } from '../skills/tripi-tropi/scripts/thread-name.mjs';
 
 const browserPath = process.env.TRIPI_TROPI_BROWSER ?? (process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : '');
 const browserAvailable = browserPath && existsSync(browserPath);
@@ -25,6 +26,21 @@ async function fixture() {
   return { base, repo, stateDirectory, issues, tickets: data.tickets };
 }
 const stop = ({ server }) => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
+
+test('optional session display name reads the latest matching index record and tolerates missing or partial metadata', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'tripi-thread-name-'));
+  try {
+    assert.equal(await readThreadName('linked-id', home), null);
+    await writeFile(path.join(home, 'session_index.jsonl'), [
+      JSON.stringify({ id: 'other-id', thread_name: 'Another session' }),
+      JSON.stringify({ id: 'linked-id', thread_name: 'Old title' }),
+      JSON.stringify({ id: 'linked-id', thread_name: 'Current title' }),
+      '{partial',
+    ].join('\n'));
+    assert.equal(await readThreadName('linked-id', home), 'Current title');
+    assert.equal(await readThreadName('unknown-id', home), null);
+  } finally { await rm(home, { recursive: true, force: true }); }
+});
 
 test('queue adapter passes separate arguments without shell, session creation or permission overrides', async () => {
   const calls = [];
@@ -91,13 +107,16 @@ test('HTTP queue requires exact origin and token and only accepts ticket identif
 
 test('browser displays linked destination, Sending and Queued separately from execution', { skip: !browserAvailable }, async () => {
   const f = await fixture(); let release; const waiting = new Promise((resolve) => { release = resolve; });
-  const viewer = await createViewer({ repo: f.repo, thread: 'explicit-test-session', queueOptions: { stateDirectory: f.stateDirectory, deliver: () => waiting } });
+  const viewer = await createViewer({ repo: f.repo, thread: 'explicit-test-session', queueOptions: { stateDirectory: f.stateDirectory, deliver: () => waiting, resolveThreadName: async () => 'Named <session>' } });
   const unbound = await createViewer({ repo: f.repo, queueOptions: { stateDirectory: f.stateDirectory } });
   const browser = await chromium.launch({ executablePath: browserPath, headless: true });
   try {
     const page = await browser.newPage(); await page.goto(viewer.url);
     await page.getByRole('button', { name: 'Queue ticket 01', exact: true }).click();
     assert.match(await page.locator('#queue-session').textContent(), /explicit-test-session/);
+    assert.equal(await page.locator('#queue-session').textContent(), 'Codex: Named <session> - explicit-test-session');
+    assert.equal(await page.locator('#queue-session .session-id').textContent(), 'explicit-test-session');
+    assert.equal(await page.locator('#queue-session session').count(), 0);
     await page.getByRole('button', { name: 'Queue implementation', exact: true }).click();
     await page.getByRole('button', { name: 'Sending', exact: true }).waitFor();
     assert.equal(await page.getByRole('button', { name: 'Sending', exact: true }).isDisabled(), true);

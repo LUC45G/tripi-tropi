@@ -63,7 +63,7 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
     try {
       if (pathname === '/api/health') return json(200, { app: 'tripi-tropi', version: 1, repo: root, pid: process.pid });
       if (pathname === '/api/snapshot') return json(200, stream.snapshot());
-      if (pathname === '/api/queue') return json(200, queue.info());
+      if (pathname === '/api/queue') { await queue.refreshThreadName(); return json(200, queue.info()); }
       if (pathname === '/api/events') return stream.subscribe(response);
       const resource = staticFiles.get(pathname);
       if (!resource) return json(404, { error: 'Resource not found.' });

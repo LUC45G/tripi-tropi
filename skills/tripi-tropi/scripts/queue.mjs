@@ -5,6 +5,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { loadTickets } from './tickets.mjs';
 import { deriveTicketStates } from './ticket-states.mjs';
+import { readThreadName } from './thread-name.mjs';
 
 export function queueMessage({ thread, message, repo, spawnProcess = spawn, timeout = 30000 }) {
   return new Promise((resolve, reject) => {
@@ -33,9 +34,11 @@ Implement and verify this ticket only. Make at least one implementation commit i
 This message was queued for the next turn; it must not interrupt current work. Queued does not mean started or completed.`;
 }
 
-export async function createQueue({ repo, thread = '', deliver = queueMessage, stateDirectory = path.join(tmpdir(), 'tripi-tropi') }) {
+export async function createQueue({ repo, thread = '', deliver = queueMessage, stateDirectory = path.join(tmpdir(), 'tripi-tropi'), resolveThreadName = readThreadName }) {
   if (typeof thread !== 'string' || thread.length > 200 || /[\x00-\x1f]/.test(thread)) throw new Error('Invalid Codex thread.');
   thread = thread.trim();
+  let threadName = null;
+  let nameReadAt = 0;
   const token = randomBytes(32).toString('hex');
   const key = createHash('sha256').update(`${repo}\n${thread}`).digest('hex').slice(0, 24);
   const ledger = path.join(stateDirectory, `${key}.queue.json`);
@@ -55,7 +58,12 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     writes = next.catch(() => {}); return next;
   }
   return {
-    info: () => ({ thread: thread || null, token, records }),
+    info: () => ({ thread: thread || null, threadName, token, records }),
+    async refreshThreadName() {
+      if (Date.now() - nameReadAt < 10000) return;
+      nameReadAt = Date.now();
+      threadName = await resolveThreadName(thread).catch(() => null);
+    },
     async enqueue(id) {
       if (!thread) return { code: 409, error: 'No Codex session linked. Launch with --thread or CODEX_THREAD_ID.' };
       if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
