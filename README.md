@@ -12,13 +12,13 @@ If you need the ticket-authoring workflow first, install [`to-tickets`](https://
 npx skills add https://github.com/mattpocock/skills --skill to-tickets
 ```
 
-The shortest installation for tripi-tropi is through the npm package:
+Once published on npm, install the package with:
 
 ```sh
-npx tripi-tropi
+npx @messieszurdo/tripi-tropi
 ```
 
-Use `pnpm dlx tripi-tropi` or `npm exec tripi-tropi` when those are your preferred package runners. Add `--update` to replace an existing tripi-tropi installation, or `--skills-dir "<your skills directory>"` to choose a supported parent directory. The package is the recommended route for new users; the checkout installer below remains useful for pinned source checkouts and local development.
+Use `pnpm dlx @messieszurdo/tripi-tropi` or `npm exec --package=@messieszurdo/tripi-tropi -- tripi-tropi` when those are your preferred package runners. Add `--update` to replace an existing tripi-tropi installation, or `--skills-dir "<your skills directory>"` to choose a supported parent directory. Until the first npm publication, use the checkout installer below; it also remains useful for pinned source checkouts and local development.
 
 From this checkout, run:
 

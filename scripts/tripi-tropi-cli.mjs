@@ -5,7 +5,7 @@ try {
   const args = process.argv.slice(2);
   const help = args.includes('--help') || args.includes('-h');
   if (help) {
-    console.log('Install tripi-tropi for Codex.\n\nUsage: npx tripi-tropi [--update] [--skills-dir <parent directory>]');
+    console.log('Install tripi-tropi for Codex.\n\nUsage: npx @messieszurdo/tripi-tropi [--update] [--skills-dir <parent directory>]');
     process.exit(0);
   }
   const skillsIndex = args.indexOf('--skills-dir');

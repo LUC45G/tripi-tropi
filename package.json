@@ -1,7 +1,8 @@
 {
-  "name": "tripi-tropi",
+  "name": "@messieszurdo/tripi-tropi",
   "version": "0.1.1",
   "private": false,
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
   "engines": { "node": ">=24" },
   "bin": { "tripi-tropi": "scripts/tripi-tropi-cli.mjs" },
