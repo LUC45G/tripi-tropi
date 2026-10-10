@@ -1,9 +1,9 @@
 # 01: Definir y validar la escritura de tickets atómicos
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: documentation, validation
 Blocked by: none
-Commits: none
+Commits: 83b513ec94e6
 
 ## Estado inicial
 
@@ -17,13 +17,13 @@ Todas las dependencias declaradas deben estar completadas antes de empezar. Este
 
 ### Criterios de aceptación
 
-- [ ] Documentar la guía obligatoria y enlazarla desde AGENTS.md y el tracker; incluir la guía reutilizable en el paquete tripi-tropi.
-- [ ] Exigir un resultado completo por ticket y dependencias resueltas antes de comenzar; dividir cualquier ejecución intercalada en tickets separados.
-- [ ] Definir Status, Execution, Labels, Blocked by y Commits, más objetivo, atomicidad, aceptación, trabajo realizado y estado posterior.
-- [ ] Exigir al menos un commit por ticket, identificándolo por número; nunca mezclar dos tickets en un commit y no hacer push sin instrucción.
-- [ ] Registrar hashes abreviados reales en Commits; explicar el commit posterior de registro para evitar autorreferencia.
-- [ ] Validar por CLI campos, estructura, identidad única, estados, hashes, referencias y ciclos sin escribir archivos; aceptar formato heredado con avisos.
-- [ ] Probar ejemplos aislados de to-tickets y qr-wedding, errores y ausencia de mutaciones; separar validación estructural de revisión semántica de atomicidad.
+- [x] Documentar la guía obligatoria y enlazarla desde AGENTS.md y el tracker; incluir la guía reutilizable en el paquete tripi-tropi.
+- [x] Exigir un resultado completo por ticket y dependencias resueltas antes de comenzar; dividir cualquier ejecución intercalada en tickets separados.
+- [x] Definir Status, Execution, Labels, Blocked by y Commits, más objetivo, atomicidad, aceptación, trabajo realizado y estado posterior.
+- [x] Exigir al menos un commit por ticket, identificándolo por número; nunca mezclar dos tickets en un commit y no hacer push sin instrucción.
+- [x] Registrar hashes abreviados reales en Commits; explicar el commit posterior de registro para evitar autorreferencia.
+- [x] Validar por CLI campos, estructura, identidad única, estados, hashes, referencias y ciclos sin escribir archivos; aceptar formato heredado con avisos.
+- [x] Probar ejemplos aislados de to-tickets y qr-wedding, errores y ausencia de mutaciones; separar validación estructural de revisión semántica de atomicidad.
 
 ## Trabajo realizado
 
@@ -33,5 +33,5 @@ Verificación: 8 pruebas pasando; los cinco tickets de tripi-tropi pasan validac
 
 ## Estado posterior
 
-Implementación y verificaciones completadas. Pendiente registrar el commit de implementación antes de cerrar. La atomicidad semántica y la veracidad de los registros requieren revisión del agente; el validador no las demuestra automáticamente.
+Completado y verificado. Commit de implementación: 83b513ec94e6. La atomicidad semántica y la veracidad de los registros requieren revisión del agente; el validador no las demuestra automáticamente. El ticket 02 queda desbloqueado.
 
