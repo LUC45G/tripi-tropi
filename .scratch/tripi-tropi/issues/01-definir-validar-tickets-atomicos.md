@@ -1,6 +1,6 @@
 # 01: Definir y validar la escritura de tickets atómicos
 Status: ready-for-agent
-Execution: pending
+Execution: in-progress
 Labels: documentation, validation
 Blocked by: none
 Commits: none
@@ -27,9 +27,11 @@ Todas las dependencias declaradas deben estar completadas antes de empezar. Este
 
 ## Trabajo realizado
 
-Pendiente. No se realizaron cambios ni verificaciones de implementación.
+Se publicó la guía obligatoria reutilizable y sus enlaces desde AGENTS.md y el tracker. Se implementaron el lector y el validador CLI de solo lectura, con formato estricto y compatibilidad heredada, validación de commits y grafo de dependencias.
+
+Verificación: 8 pruebas pasando; los cinco tickets de tripi-tropi pasan validación estricta sin errores ni avisos. Los 14 tickets de qr-wedding se leen sin errores, con 64 avisos de campos/secciones heredados. Se corrigió la interpretación de comas dentro de títulos de dependencias. Las pruebas verifican que la lectura y CLI no alteren los archivos observados.
 
 ## Estado posterior
 
-Pendiente de implementación y verificación. Registrar resultados, problemas, soluciones y pendientes antes de completar.
+Implementación y verificaciones completadas. Pendiente registrar el commit de implementación antes de cerrar. La atomicidad semántica y la veracidad de los registros requieren revisión del agente; el validador no las demuestra automáticamente.
 
