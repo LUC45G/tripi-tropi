@@ -12,15 +12,15 @@ If you need the ticket-authoring workflow first, install [`to-tickets`](https://
 npx skills add https://github.com/mattpocock/skills --skill to-tickets
 ```
 
-Once published on npm, install the package with:
+Install the [npm package](https://www.npmjs.com/package/@messieszurdo/tripi-tropi) with:
 
 ```sh
 npx @messieszurdo/tripi-tropi
 ```
 
-Use `pnpm dlx @messieszurdo/tripi-tropi` or `npm exec --package=@messieszurdo/tripi-tropi -- tripi-tropi` when those are your preferred package runners. Add `--update` to replace an existing tripi-tropi installation, or `--skills-dir "<your skills directory>"` to choose a supported parent directory. Until the first npm publication, use the checkout installer below; it also remains useful for pinned source checkouts and local development.
+Use `pnpm dlx @messieszurdo/tripi-tropi` or `npm exec --package=@messieszurdo/tripi-tropi -- tripi-tropi` when those are your preferred package runners. Add `--update` to replace an existing tripi-tropi installation, or `--skills-dir "<your skills directory>"` to choose a supported parent directory. For a reproducible installation, append `@<version>` to the package name.
 
-From this checkout, run:
+For local development or a pinned source checkout, the fallback installer remains available:
 
 ```sh
 node scripts/install-skill.mjs
@@ -64,7 +64,13 @@ node "/path/to/skills/tripi-tropi/scripts/launch.mjs" --repo "/path/to/my repo" 
 
 ## Update or reinstall
 
-Stop viewers using the installed package, select the desired checkout version, then run:
+Stop viewers using the installed package, then update from npm:
+
+```sh
+npx @messieszurdo/tripi-tropi@latest --update
+```
+
+To reinstall a specific release, replace `latest` with its version. For an installation from checkout, select the desired checkout version and run:
 
 ```sh
 node scripts/install-skill.mjs --update
