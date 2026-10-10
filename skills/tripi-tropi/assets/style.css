@@ -22,6 +22,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .brand-mark { width: 28px; height: 28px; object-fit: contain; }
 .sidebar-toggle { min-width: 32px; font-size: 20px; padding: 3px 8px; }
 #live-status { margin-left: auto; }
+.queue-session { color: var(--muted); font-size: 11px; min-width: 0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-controls { border-bottom: 1px solid var(--line); margin-bottom: 20px; padding-bottom: 12px; }
+.queue-controls p { font-size: 12px; line-height: 1.6; }
 .repo-name { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .read-only { margin-left: auto; font-size: 12px; color: var(--muted); border-left: 1px solid var(--line); padding-left: 18px; white-space: nowrap; }
 .refresh { background: #253644; border: 1px solid #456073; border-radius: 5px; padding: 7px 12px; }
@@ -173,6 +176,7 @@ button.dependency-link:hover { background: #263946; }
   .mobile-tabs button { flex: 1; padding: 9px; border: 1px solid #456073; border-radius: 4px; background: #22313e; }
   .mobile-tabs button[aria-pressed="true"] { background: #263c4c; color: var(--accent); }
   .repo-name { display: none; } .topbar { gap: 10px; padding: 0 12px; } .read-only { padding-left: 8px; font-size: 11px; }
+  .queue-session { max-width: 75px; }
   .brand { font-size: 16px; } .brand-mark { width: 22px; height: 22px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

@@ -30,9 +30,12 @@ async function main() {
   const { values } = parseArgs({ options: {
     repo: { type: 'string', default: process.cwd() }, port: { type: 'string', default: '0' },
     'no-open': { type: 'boolean' }, stop: { type: 'boolean' },
+    thread: { type: 'string' },
   } });
   const repo = await realpath(path.resolve(values.repo));
   const port = Number(values.port);
+  const thread = (values.thread ?? process.env.CODEX_THREAD_ID ?? '').trim();
+  if (thread.length > 200 || /[\x00-\x1f]/.test(thread)) throw new Error('Invalid Codex thread.');
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be an integer from 0 to 65535.');
   const state = path.join(tmpdir(), 'tripi-tropi');
   await mkdir(state, { recursive: true });
@@ -60,6 +63,7 @@ async function main() {
       console.log('tripi-tropi stopped.'); return;
     }
     if (existing) {
+      if ((existing.thread ?? '') !== thread) throw new Error(`This viewer is linked to ${existing.thread || 'no session'}. Stop it before linking a different Codex session.`);
       if (port && new URL(existing.url).port !== String(port)) throw new Error(`An instance already runs at ${existing.url}. Stop it before changing ports.`);
       if (!values['no-open']) openBrowser(existing.url);
       console.log(JSON.stringify({ url: existing.url, reused: true, pid: existing.pid, log })); return;
@@ -68,7 +72,7 @@ async function main() {
     const descriptor = openSync(log, 'a');
     const child = spawn(process.execPath, [fileURLToPath(new URL('./server.mjs', import.meta.url))], {
       detached: true, windowsHide: true, stdio: ['ignore', descriptor, descriptor, 'ipc'],
-      env: { ...process.env, TRIPI_TROPI_REPO: repo, TRIPI_TROPI_PORT: String(port), TRIPI_TROPI_TOKEN: token },
+      env: { ...process.env, TRIPI_TROPI_REPO: repo, TRIPI_TROPI_PORT: String(port), TRIPI_TROPI_TOKEN: token, TRIPI_TROPI_THREAD: thread },
     });
     closeSync(descriptor);
     const ready = await new Promise((resolve, reject) => {
@@ -77,7 +81,7 @@ async function main() {
       child.once('exit', (code) => { clearTimeout(timeout); reject(new Error(`Server exited (${code}). Read ${log}.`)); });
       child.once('message', (message) => { clearTimeout(timeout); message.error ? reject(new Error(`${message.error} Read ${log}.`)) : resolve(message); });
     });
-    try { await writeFile(registry, JSON.stringify({ url: ready.url, repo, pid: child.pid, token }), { mode: 0o600 }); }
+    try { await writeFile(registry, JSON.stringify({ url: ready.url, repo, pid: child.pid, token, thread }), { mode: 0o600 }); }
     catch (error) { child.kill(); throw error; }
     child.disconnect(); child.unref();
     if (!values['no-open']) openBrowser(ready.url);

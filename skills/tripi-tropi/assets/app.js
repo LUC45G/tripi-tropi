@@ -13,6 +13,7 @@ let layout = { sidebar: 220, split: 50 };
 let sidebarCollapsed = false;
 let storageTimer;
 let eventSource;
+let queueInfo = { thread: null, token: '', records: {} };
 const workspace = document.querySelector('.workspace');
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
@@ -191,6 +192,29 @@ function diagnostics(items) {
   return `<details class="diagnostics" ${errors ? 'open' : ''}><summary>${errors ? `${errors} validation errors` : `${items.length} format notices`}</summary><ul>${items.map((item) => `<li class="${item.severity === 'error' ? 'error-text' : ''}">${escapeHTML(item.message)}</li>`).join('')}</ul></details>`;
 }
 
+function queueControls(ticket) {
+  const record = Object.hasOwn(queueInfo.records, ticket.id) ? queueInfo.records[ticket.id] : null;
+  const ready = ticket.displayState === 'Ready to implement' && ticket.triageRole === 'ready-for-agent';
+  if (!ready && !record) return '';
+  const disabled = !queueInfo.thread || !queueInfo.token || Boolean(record);
+  const button = ready ? `<button type="button" class="refresh" data-queue="${escapeHTML(ticket.id)}" ${disabled ? 'disabled' : ''}>${escapeHTML(record?.status ?? 'Queue implementation')}</button>` : '';
+  const message = record?.error ?? (record ? 'Delivery status only; ticket execution is shown separately. Check the linked session before any new send.' : queueInfo.thread ? 'Send this ticket to the linked Codex session after its current turn.' : 'No Codex session linked. Launch with --thread to enable sending.');
+  return `<section class="queue-controls">${button}<p role="status" class="${record?.error ? 'error-text' : 'muted'}">${escapeHTML(message)}</p></section>`;
+}
+
+async function loadQueue() {
+  try {
+    const response = await fetch('/api/queue');
+    if (!response.ok) throw new Error('Could not read linked session.');
+    queueInfo = await response.json();
+    el('queue-session').textContent = queueInfo.thread ? `Codex: ${queueInfo.thread}` : 'Codex: not linked';
+    el('queue-session').title = queueInfo.thread ? `Queue destination: ${queueInfo.thread}` : 'No Codex session linked';
+  } catch {
+    queueInfo = { thread: null, token: '', records: {} };
+    el('queue-session').textContent = 'Codex: unavailable';
+  }
+}
+
 function render() {
   const scroll = scrollPositions();
   const openDiagnostics = el('detail').querySelector('.diagnostics')?.open;
@@ -216,6 +240,7 @@ function render() {
     const filtered = !matchesFilters(ticket) ? '<div class="filtered-selection" role="status">This ticket is outside the current filters. Filters are still active.</div>' : '';
     const progress = ticket.progress.total ? `<div class="acceptance-progress"><span>Acceptance criteria</span><progress value="${ticket.progress.checked}" max="${ticket.progress.total}" aria-label="Acceptance criteria progress"></progress><span>${ticket.progress.checked} / ${ticket.progress.total}</span></div>` : '<p class="muted acceptance-empty">No acceptance checklist recorded.</p>';
     el('detail').innerHTML = `${filtered}<div class="ticket-meta">${stateChip(ticket.displayState)}<span class="raw-status">${escapeHTML(ticket.metadata.Status || 'No triage status')}</span></div><div class="detail-labels">${ticket.labels.map(labelChip).join('')}</div>${progress}<div class="commit-record"><span>Implementation commits</span><div>${commitChips(ticket)}</div></div><section class="dependency-record"><h3>Dependencies</h3>${dependencyList(ticket)}</section>${diagnostics(ticket.diagnostics)}<article class="markdown">${markdown(ticket.content)}</article>`;
+    el('detail').insertAdjacentHTML('afterbegin', queueControls(ticket));
   } else if (feature) {
     el('detail-kind').textContent = 'Feature overview';
     el('detail-path').textContent = feature.descriptionFile ? `${feature.name}/${feature.descriptionFile}` : feature.name;
@@ -257,7 +282,7 @@ function normalizeSelection() {
 
 function connectLive() {
   eventSource = new EventSource('/api/events');
-  eventSource.onopen = () => { el('live-status').textContent = 'Live'; el('live-status').dataset.connection = 'live'; };
+  eventSource.onopen = () => { el('live-status').textContent = 'Live'; el('live-status').dataset.connection = 'live'; loadQueue().then(() => { if (workspaceKey) render(); }); };
   eventSource.onerror = () => { el('live-status').textContent = 'Reconnecting…'; el('live-status').dataset.connection = 'offline'; };
   eventSource.addEventListener('snapshot', (event) => {
     try { applySnapshot(JSON.parse(event.data)); } catch (error) { el('error').textContent = `Could not display updates. ${error.message}`; el('error').hidden = false; }
@@ -271,7 +296,7 @@ async function refresh() {
   if (loading) return;
   loading = true; el('refresh').disabled = true; el('refresh').textContent = 'Refreshing…';
   try {
-    const response = await fetch('/api/snapshot');
+    const [response] = await Promise.all([fetch('/api/snapshot'), loadQueue()]);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? 'Could not read local tickets.');
     applySnapshot(data);
@@ -295,6 +320,20 @@ el('detail').addEventListener('click', (event) => {
   const link = event.target.closest('[data-ticket]');
   if (!link) return;
   event.preventDefault(); navigateTicket(link.dataset.ticket);
+});
+el('detail').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-queue]');
+  if (!button || button.disabled) return;
+  const ticket = button.dataset.queue;
+  queueInfo.records[ticket] = { status: 'Sending' }; render();
+  try {
+    const response = await fetch('/api/queue', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Queue-Token': queueInfo.token }, body: JSON.stringify({ ticket }) });
+    const result = await response.json();
+    queueInfo.records[ticket] = result.record ?? { status: 'Error', error: result.error ?? 'Delivery failed. Check the linked session.' };
+  } catch (error) {
+    queueInfo.records[ticket] = { status: 'Error', error: `Delivery could not be confirmed. ${error.message} Check the linked session; no automatic retry was sent.` };
+  }
+  render();
 });
 el('state-filter').addEventListener('change', (event) => { recordCurrentScroll(); selectedState = event.target.value; render(); writeRoute('push'); });
 el('label-options').addEventListener('change', (event) => {
