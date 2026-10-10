@@ -1,9 +1,9 @@
 # 02: Abrir el visor local desde la skill tripi-tropi
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: viewer, skill
 Blocked by: 01
-Commits: none
+Commits: 31622b9099ce
 
 ## Estado inicial
 
@@ -37,5 +37,5 @@ Verificación: 11 pruebas pasando, incluida UI real en Edge headless, sanitizaci
 
 ## Estado posterior
 
-Implementación verificada; pendiente registrar el commit para cerrar. Se corrigió el crecimiento vertical del layout para que el detalle tenga scroll propio. La actualización en vivo, filtros, navegación entre bloqueantes y cola de Codex corresponden a los tickets 03–05; esta entrega usa Refresh manual y estados explícitos.
+Completado y verificado. Commit de implementación: 31622b9099ce. Se corrigió el crecimiento vertical del layout para que el detalle tenga scroll propio. La actualización en vivo, filtros, navegación entre bloqueantes y cola de Codex corresponden a los tickets 03–05; esta entrega usa Refresh manual y estados explícitos. El ticket 03 queda desbloqueado.
 
