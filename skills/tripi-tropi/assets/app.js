@@ -17,6 +17,13 @@ let eventSource;
 let queueInfo = { thread: null, token: '', records: {} };
 const workspace = document.querySelector('.workspace');
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+async function loadSkillVersion() {
+  try {
+    const response = await fetch('/api/health');
+    const health = await response.json();
+    if (response.ok && health.skillVersion) el('skill-version').textContent = `v${health.skillVersion}`;
+  } catch { /* The live connection reports any later server error. */ }
+}
 
 function scrollPositions() {
   return { detail: el('detail').scrollTop, list: el('ticket-list').scrollTop, features: el('features').scrollTop };
@@ -447,4 +454,5 @@ for (const [id, kind] of [['sidebar-splitter', 'sidebar'], ['detail-splitter', '
 window.addEventListener('resize', applyLayout);
 window.addEventListener('pagehide', () => { persistWorkspace(); eventSource?.close(); });
 window.addEventListener('pageshow', () => { if (eventSource?.readyState === EventSource.CLOSED) connectLive(); });
+loadSkillVersion();
 refresh().finally(connectLive);

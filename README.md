@@ -1,5 +1,7 @@
 # tripi-tropi
 
+[![Skill version](https://img.shields.io/github/package-json/v/LUC45G/tripi-tropi?filename=skills%2Ftripi-tropi%2Fpackage.json)](https://github.com/LUC45G/tripi-tropi/blob/main/skills/tripi-tropi/package.json)
+
 A local, read-only ticket viewer for `.scratch/<feature>/issues/*.md` created with the [`to-tickets`](https://github.com/mattpocock/skills) skill. Install or otherwise make `to-tickets` available in the repository if you want to create and maintain tickets; the viewer itself only reads existing Markdown files. It runs independently while your agent works. Node.js 24+ with npm and registry access are required; Codex CLI with `queue` support is optional for sending implementation requests.
 
 ## Install

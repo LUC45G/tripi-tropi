@@ -22,7 +22,7 @@ async function liveInstance(registry, repo) {
     if (url.hostname !== '127.0.0.1' || url.protocol !== 'http:' || url.pathname !== '/' || url.username || url.password) return null;
     const response = await fetch(`${record.url}/api/health`, { signal: AbortSignal.timeout(1200) });
     const health = await response.json();
-    return health.app === 'tripi-tropi' && health.version === 1 && health.repo === repo && health.pid === record.pid ? record : null;
+    return health.app === 'tripi-tropi' && health.protocolVersion === 1 && health.repo === repo && health.pid === record.pid ? record : null;
   } catch { return null; }
 }
 

@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url';
 import { timingSafeEqual } from 'node:crypto';
 import { createSnapshotStream } from './snapshot-stream.mjs';
 import { createQueue } from './queue.mjs';
+import { readFileSync } from 'node:fs';
 
 const skillRoot = fileURLToPath(new URL('../', import.meta.url));
+const skillVersion = JSON.parse(readFileSync(path.join(skillRoot, 'package.json'), 'utf8')).version;
 const staticFiles = new Map([
   ['/', ['assets/index.html', 'text/html']],
   ['/app.js', ['assets/app.js', 'text/javascript']],
@@ -61,7 +63,7 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
     }
     if (request.method !== 'GET') return json(405, { error: 'This viewer is read-only.' });
     try {
-      if (pathname === '/api/health') return json(200, { app: 'tripi-tropi', version: 1, repo: root, pid: process.pid });
+      if (pathname === '/api/health') return json(200, { app: 'tripi-tropi', protocolVersion: 1, skillVersion, repo: root, pid: process.pid });
       if (pathname === '/api/snapshot') return json(200, stream.snapshot());
       if (pathname === '/api/queue') { await queue.refreshThreadName(); return json(200, queue.info()); }
       if (pathname === '/api/events') return stream.subscribe(response);
