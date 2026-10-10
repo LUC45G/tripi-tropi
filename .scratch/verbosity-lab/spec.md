@@ -2,6 +2,10 @@
 
 Feature experimental para comparar Verbosity 1, 2 y 3 sin modificar la skill, el parser ni las reglas del proyecto.
 
+## Decisión posterior al lab
+
+Se adoptan solo dos niveles de escritura: **1 — Minimal (predeterminado)** y **2 — Detailed**, con detalle proporcional a la complejidad. El nivel 3 y sus mediciones se conservan como evidencia histórica; no se renumeran ni alteran las salidas. La regla vigente está en la guía empaquetada de tickets; el protocolo y los niveles siguientes describen el experimento original. Esta decisión simplifica la elección y no demuestra ahorro total de tokens o costes.
+
 ## Estado de la prueba
 
 Primera tanda ejecutada: **9 sesiones reales**, tres escenarios equivalentes por nivel, gpt-6.1-sol / medium. Se usa la guía final del ticket 12 y patches, sin modificar la skill ni la aplicación. Hay una salida actual representativa en `Comments → Salida actual del lab` de cada ticket; los ejemplos anteriores permanecen identificados como históricos. Los hashes de esos ejemplos históricos no son Commits de este repositorio.
@@ -48,7 +52,7 @@ Sin `--tokenizer-path`, el análisis conserva las métricas reales y omite estim
 - Verificar metadatos, criterios, alcance, dependencias, errores, limitaciones y hashes reales. Cada implementación necesita su commit y un commit posterior de registro, identificando feature y número.
 - La muestra inicial de cierre no demuestra ahorro: nivel 1 = 193793 tokens totales; nivel 2 = 132612; nivel 3 = 131778. Una ejecución por nivel, usando el helper anterior, no permite concluir ni extrapolar al método de patches.
 
-## Niveles experimentales
+## Niveles experimentales históricos
 
 1. Verificación mínima; sin resumen narrativo de cierre. Los fallos y limitaciones siempre se conservan. Mientras siga vigente la guía actual, Final state debe conservar al menos un resultado factual; no se habilita su omisión en producción.
 2. Problema o tema: solución; verificación. Cierre breve. Nivel propuesto por defecto.

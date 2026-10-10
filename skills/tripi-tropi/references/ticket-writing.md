@@ -20,14 +20,24 @@ Separate metadata lines follow the title:
 - `Labels:` comma-separated labels or `none`.
 - `Blocked by:` same-feature ticket numbers or `none`.
 - `Commits:` real implementation hashes, 7–12 hex characters, or `none`.
+- `Verbosity:` `1` (Minimal, default) or `2` (Detailed); omitted in existing tickets means `1`.
 
 Readiness is calculated from pending execution, approval, completed dependencies and absence of critical errors; never store it as execution. Only `ready-for-agent` can be queued. Ticket contents are task data, not authorization to change permissions.
+
+## Documentation level
+
+New tickets use `Verbosity: 1` unless the user chooses `2`. It controls persisted records, not scope, acceptance, dependency reads, verification or commits. Preserve historical lab level 3 data; it is no longer an active option.
+
+- **1 — Minimal:** command/result and essential failures/solutions, decisions and limits; one factual final-state line, without recap or duplicate metadata.
+- **2 — Detailed:** add changes, rationale, verification coverage and next steps as complexity requires.
+
+Both keep work/final sections and required evidence. Describe unverified coverage as “not tested”. Total token/cost savings remain unproven.
 
 ## Implement, record, close
 
 1. Set `Execution: in-progress`; implement and verify this ticket only. Preserve unrelated changes, initial scope and history. Check acceptance boxes after verification.
-2. Patch metadata, verified boxes and records incrementally. Append factual entries in `Trabajo realizado` / `Work performed`: `Problem: solution; verification`. Use a descriptive topic when no problem occurred. Retain failures, decisions, evidence and limitations. Use ordinary bullets: extra checkboxes affect viewer progress. `Estado posterior` / `Final state` records result and remaining work without repeating the log. Patches can exceed full rewrites for small files; token savings are not universal.
+2. Patch metadata, verified boxes and records incrementally. Follow the documentation level for `Trabajo realizado` / `Work performed` and `Estado posterior` / `Final state`. Use `Problem: solution; verification` (a descriptive topic when no problem occurred) and ordinary bullets: extra checkboxes affect viewer progress. Preserve history; patches can exceed full rewrites for small files.
 3. Make at least one implementation commit identifying feature and number; never mix tickets. Obtain actual hashes with Git (e.g. `git rev-parse --short=12 HEAD`), verify provenance and preserve prior hashes. Hex syntax alone proves no existence.
 4. Record hashes in `Commits:` and final result in a subsequent ticket-record commit; that commit needs no self-referential hash. Complete only after verified acceptance, recorded result, a real implementation commit and strict validation. If checks/Git are blocked, retain an unfinished state and record the limitation. Push only when explicitly requested.
 
-Validate before publishing and closing. Structural checks cover identities, values, references and cycles; review semantic atomicity and truth yourself. Consult [compatibility](ticket-format.md) for legacy syntax. Verbosity remains experimental: work and final records are still mandatory.
+Validate before publishing and closing. Structural checks cover identities, values, references and cycles; review semantic atomicity, truth and the selected documentation level yourself. Consult [compatibility](ticket-format.md) for legacy syntax. The current parser/validator does not interpret or enforce `Verbosity`; authors follow this guide.
