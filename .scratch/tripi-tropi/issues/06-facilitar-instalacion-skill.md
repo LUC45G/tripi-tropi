@@ -1,9 +1,9 @@
 # 06: Facilitar la instalación de la skill tripi-tropi
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: installation, skill
 Blocked by: 04, 05
-Commits: none
+Commits: a24a1fe6af60
 
 ## Estado inicial
 
@@ -17,14 +17,14 @@ Las capacidades finales del visor y la integración con Codex deben estar termin
 
 ### Criterios de aceptación
 
-- [ ] Ofrecer un comando documentado que instale la skill completa y sus dependencias en el directorio de skills del usuario, con destino configurable.
-- [ ] Comprobar Node.js y requisitos antes de instalar y explicar errores accionables sin dejar una instalación parcialmente activa.
-- [ ] Conservar la configuración del usuario y skills ajenas; no sobrescribir silenciosamente una instalación existente.
-- [ ] Permitir actualizar o reinstalar tripi-tropi de manera explícita y reproducible, sin copiar node_modules del desarrollador.
-- [ ] Incluir instrucciones breves de instalación, descubrimiento de la skill, lanzamiento, parada y actualización.
-- [ ] Instalar en un destino aislado y verificar que el paquete puede abrir tickets de dos repos distintos, incluidos directorios con espacios.
-- [ ] Validar el paquete distribuido y documentar cualquier paso necesario para que Codex descubra la skill nueva.
-- [ ] Crear al menos un commit de implementación del ticket y registrar su hash abreviado real en Commits antes de cerrar.
+- [x] Ofrecer un comando documentado que instale la skill completa y sus dependencias en el directorio de skills del usuario, con destino configurable.
+- [x] Comprobar Node.js y requisitos antes de instalar y explicar errores accionables sin dejar una instalación parcialmente activa.
+- [x] Conservar la configuración del usuario y skills ajenas; no sobrescribir silenciosamente una instalación existente.
+- [x] Permitir actualizar o reinstalar tripi-tropi de manera explícita y reproducible, sin copiar node_modules del desarrollador.
+- [x] Incluir instrucciones breves de instalación, descubrimiento de la skill, lanzamiento, parada y actualización.
+- [x] Instalar en un destino aislado y verificar que el paquete puede abrir tickets de dos repos distintos, incluidos directorios con espacios.
+- [x] Validar el paquete distribuido y documentar cualquier paso necesario para que Codex descubra la skill nueva.
+- [x] Crear al menos un commit de implementación del ticket y registrar su hash abreviado real en Commits antes de cerrar.
 
 ## Trabajo realizado
 
@@ -36,4 +36,4 @@ Verificación: 25 pruebas Node/Edge pasan, sin omisiones. La prueba nueva instal
 
 ## Estado posterior
 
-Implementación y verificaciones terminadas; pendiente registrar el commit real y cerrar este ticket. No se instaló globalmente en el perfil del usuario. La descarga requiere acceso al registro npm; Node.js 24+ con npm es obligatorio. Los shortcuts y los tickets 07, 08 y 09 conservan su alcance y estado.
+Completado y verificado. Implementación a24a1fe6af60; hash registrado mediante este cierre separado. No se instaló globalmente en el perfil del usuario. La descarga requiere acceso al registro npm; Node.js 24+ con npm es obligatorio. Los shortcuts y los tickets 07, 08 y 09 conservan su alcance y estado.
