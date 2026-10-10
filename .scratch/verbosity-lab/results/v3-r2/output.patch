@@ -1,0 +1,27 @@
+--- a/.scratch/verbosity-lab/results/v3-r2/ticket.md
++++ b/.scratch/verbosity-lab/results/v3-r2/ticket.md
+@@ -1,7 +1,7 @@
+ # 01: Verify integer-sum fixture
+ Status: ready-for-agent
+-Execution: in-progress
++Execution: completed
+ Labels: experiment
+ Blocked by: none
+ Commits: 05f5060da4d2
+@@ -12,10 +12,12 @@
+ One isolated verified result; no dependencies or interleaving.
+ ### Acceptance criteria
+-- [ ] Positive integer sum verified.
+-- [ ] Negative integer sum verified.
+-- [ ] Fractional input rejection verified.
++- [x] Positive integer sum verified.
++- [x] Negative integer sum verified.
++- [x] Fractional input rejection verified.
+ ## Work performed
+-Pending.
++- Fixture behavior: the prepared implementation adds integer inputs and throws TypeError for non-integer inputs. Verification covers positive sums, negative sums and fractional input rejection.
++- Verification failure: an initial command targeted missing.test.mjs and exited nonzero; correcting the test path resolved the failure.
++- Verification: node --test .scratch/verbosity-lab/fixture/sum.test.mjs passed all 3 tests. Coverage is limited to these three fixture cases; no further failures or remaining work were observed.
+ ## Final state
+-Pending.
++All three acceptance criteria are verified, and fixture commit 05f5060da4d2 is retained. No fixture work remains. The controller will apply this closure patch, independently verify it and maintain the canonical lab ticket and commits.

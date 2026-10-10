@@ -1,0 +1,27 @@
+{
+  "stage": "independent post-run verification",
+  "results": [
+    {
+      "command": [
+        "node",
+        "--test",
+        ".scratch/verbosity-lab/fixture/sum.test.mjs"
+      ],
+      "exit": 0,
+      "stdout": "✔ positive integer sum (0.9805ms)\n✔ negative integer sum (0.1521ms)\n✔ fractional input rejected (0.4671ms)\nℹ tests 3\nℹ suites 0\nℹ pass 3\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 91.2273\n",
+      "stderr": "",
+      "purpose": "successful fixture verification"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        ".scratch/verbosity-lab/fixture/missing.test.mjs"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Could not find '.scratch/verbosity-lab/fixture/missing.test.mjs'\n",
+      "purpose": "intentional missing-path control"
+    }
+  ]
+}

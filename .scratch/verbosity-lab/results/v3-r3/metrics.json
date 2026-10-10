@@ -1,0 +1,29 @@
+{
+  "case": "v3-r3",
+  "level": 3,
+  "repetition": 3,
+  "model": "gpt-6.1-sol",
+  "reasoning": "medium",
+  "exit": 0,
+  "seconds": 11.14,
+  "usage": {
+    "input_tokens": 16839,
+    "cached_input_tokens": 12544,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 364,
+    "reasoning_output_tokens": 0
+  },
+  "toolCalls": 0,
+  "retries": 0,
+  "inputSha256": "b642346db83a43939f75245b28cbf6a176b3657f57a00eb28f2b5260683b9915",
+  "quality": {
+    "scopeAndMetadataPreserved": true,
+    "verifiedCheckboxes": 3,
+    "commandAndCountPresent": true,
+    "requiredIssuesRetained": true,
+    "recordBytes": 843,
+    "finalBytes": 309
+  },
+  "rawLog": ".cache/verbosity-lab/v3-r3.jsonl",
+  "valid": true
+}

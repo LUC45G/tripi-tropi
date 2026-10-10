@@ -1,0 +1,415 @@
+{
+  "method": "Closure patch generation only; native Codex counters; not billed cost or full implementation",
+  "checks": {
+    "strictValidFixtures": 9,
+    "explicitMatchedPrompts": true,
+    "preparedSourceUnchanged": true,
+    "manualReviewRequired": "Quality flags check structure and required evidence; review actual claims separately."
+  },
+  "groups": [
+    {
+      "level": 1,
+      "trials": 3,
+      "input": 49550,
+      "cachedInputSubset": 25088,
+      "uncachedInput": 24462,
+      "outputIncludingReasoning": 759,
+      "reasoningOutputSubset": 0,
+      "outputWithoutReasoning": 759,
+      "processedTokens": 50309,
+      "medianProcessedTokens": 16633,
+      "meanRecordBytes": 258.67,
+      "meanRecordTokenEstimates": {
+        "o200k_base": 56.33,
+        "cl100k_base": 55.67
+      },
+      "seconds": 27.18
+    },
+    {
+      "level": 2,
+      "trials": 3,
+      "input": 49071,
+      "cachedInputSubset": 37632,
+      "uncachedInput": 11439,
+      "outputIncludingReasoning": 963,
+      "reasoningOutputSubset": 137,
+      "outputWithoutReasoning": 826,
+      "processedTokens": 50034,
+      "medianProcessedTokens": 16657,
+      "meanRecordBytes": 354.33,
+      "meanRecordTokenEstimates": {
+        "o200k_base": 72.33,
+        "cl100k_base": 71.33
+      },
+      "seconds": 30.74
+    },
+    {
+      "level": 3,
+      "trials": 3,
+      "input": 50508,
+      "cachedInputSubset": 37632,
+      "uncachedInput": 12876,
+      "outputIncludingReasoning": 1072,
+      "reasoningOutputSubset": 0,
+      "outputWithoutReasoning": 1072,
+      "processedTokens": 51580,
+      "medianProcessedTokens": 17195,
+      "meanRecordBytes": 831.67,
+      "meanRecordTokenEstimates": {
+        "o200k_base": 160.67,
+        "cl100k_base": 159.33
+      },
+      "seconds": 34.52
+    }
+  ],
+  "comparisons": [
+    {
+      "level1Vs": 2,
+      "outputPercentChange": -21.18,
+      "outputWithoutReasoningPercentChange": -8.11,
+      "processedTokensPercentChange": 0.55
+    },
+    {
+      "level1Vs": 3,
+      "outputPercentChange": -29.2,
+      "outputWithoutReasoningPercentChange": -29.2,
+      "processedTokensPercentChange": -2.46
+    }
+  ],
+  "trials": [
+    {
+      "case": "v1-r1",
+      "level": 1,
+      "repetition": 1,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 8.71,
+      "usage": {
+        "input_tokens": 16336,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 244,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "ab5541887eb1c0665eed59f5eb337d2fc1d833a11bf67d36567dbed28ec2a567",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 209,
+        "finalBytes": 72
+      },
+      "rawLog": ".cache/verbosity-lab/v1-r1.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 46,
+        "cl100k_base": 46
+      },
+      "uncachedInput": 16336,
+      "processedTokens": 16580,
+      "outputWithoutReasoning": 244
+    },
+    {
+      "case": "v1-r2",
+      "level": 1,
+      "repetition": 2,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 9.07,
+      "usage": {
+        "input_tokens": 16375,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 258,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "81c0621c7d53547c4c754da7abb3c400c0e0b0dcf04a0af18cf713df004777ee",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 294,
+        "finalBytes": 69
+      },
+      "rawLog": ".cache/verbosity-lab/v1-r2.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 64,
+        "cl100k_base": 62
+      },
+      "uncachedInput": 3831,
+      "processedTokens": 16633,
+      "outputWithoutReasoning": 258
+    },
+    {
+      "case": "v1-r3",
+      "level": 1,
+      "repetition": 3,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 9.4,
+      "usage": {
+        "input_tokens": 16839,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 257,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "342b2b0b38d16bfe7bf46c51465d7c91d31fa0e2266812b3e1f652b365819ccc",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 273,
+        "finalBytes": 90
+      },
+      "rawLog": ".cache/verbosity-lab/v1-r3.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 59,
+        "cl100k_base": 59
+      },
+      "uncachedInput": 4295,
+      "processedTokens": 17096,
+      "outputWithoutReasoning": 257
+    },
+    {
+      "case": "v2-r1",
+      "level": 2,
+      "repetition": 1,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 12.23,
+      "usage": {
+        "input_tokens": 16336,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 401,
+        "reasoning_output_tokens": 137
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "b300ef2656439c91ba907abb69699497b3b8692e972924f33666a5cdd1c27856",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 235,
+        "finalBytes": 48
+      },
+      "rawLog": ".cache/verbosity-lab/v2-r1.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 51,
+        "cl100k_base": 50
+      },
+      "uncachedInput": 3792,
+      "processedTokens": 16737,
+      "outputWithoutReasoning": 264
+    },
+    {
+      "case": "v2-r2",
+      "level": 2,
+      "repetition": 2,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 9.85,
+      "usage": {
+        "input_tokens": 16375,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 282,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "fca718dac543d3e1b277c1d027b528e70b175b53e58cecf2504acfbb619959db",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 423,
+        "finalBytes": 86
+      },
+      "rawLog": ".cache/verbosity-lab/v2-r2.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 84,
+        "cl100k_base": 82
+      },
+      "uncachedInput": 3831,
+      "processedTokens": 16657,
+      "outputWithoutReasoning": 282
+    },
+    {
+      "case": "v2-r3",
+      "level": 2,
+      "repetition": 3,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 8.66,
+      "usage": {
+        "input_tokens": 16360,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 280,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "c30922eabc4e40cc889cf23790386ee1085c428ae7fbc5b3d2d874855b5e8926",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 405,
+        "finalBytes": 123
+      },
+      "rawLog": ".cache/verbosity-lab/v2-r3.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 82,
+        "cl100k_base": 82
+      },
+      "uncachedInput": 3816,
+      "processedTokens": 16640,
+      "outputWithoutReasoning": 280
+    },
+    {
+      "case": "v3-r1",
+      "level": 3,
+      "repetition": 1,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 12.81,
+      "usage": {
+        "input_tokens": 16815,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 367,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "16a5a44dca9abcea6be3e5f5af76ce75c15cec82f6910dbf7ede1fa7c149eac4",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 893,
+        "finalBytes": 250
+      },
+      "rawLog": ".cache/verbosity-lab/v3-r1.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 169,
+        "cl100k_base": 168
+      },
+      "uncachedInput": 4271,
+      "processedTokens": 17182,
+      "outputWithoutReasoning": 367
+    },
+    {
+      "case": "v3-r2",
+      "level": 3,
+      "repetition": 2,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 10.57,
+      "usage": {
+        "input_tokens": 16854,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 341,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "6bdd42de18885e4235c68a3c19df3f32b7dedd2aadb9830441311880cf6dba16",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 759,
+        "finalBytes": 234
+      },
+      "rawLog": ".cache/verbosity-lab/v3-r2.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 147,
+        "cl100k_base": 145
+      },
+      "uncachedInput": 4310,
+      "processedTokens": 17195,
+      "outputWithoutReasoning": 341
+    },
+    {
+      "case": "v3-r3",
+      "level": 3,
+      "repetition": 3,
+      "model": "gpt-6.1-sol",
+      "reasoning": "medium",
+      "exit": 0,
+      "seconds": 11.14,
+      "usage": {
+        "input_tokens": 16839,
+        "cached_input_tokens": 12544,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 364,
+        "reasoning_output_tokens": 0
+      },
+      "toolCalls": 0,
+      "retries": 0,
+      "inputSha256": "b642346db83a43939f75245b28cbf6a176b3657f57a00eb28f2b5260683b9915",
+      "quality": {
+        "scopeAndMetadataPreserved": true,
+        "verifiedCheckboxes": 3,
+        "commandAndCountPresent": true,
+        "requiredIssuesRetained": true,
+        "recordBytes": 843,
+        "finalBytes": 309
+      },
+      "rawLog": ".cache/verbosity-lab/v3-r3.jsonl",
+      "valid": true,
+      "textTokenEstimates": {
+        "o200k_base": 166,
+        "cl100k_base": 165
+      },
+      "uncachedInput": 4295,
+      "processedTokens": 17203,
+      "outputWithoutReasoning": 364
+    }
+  ],
+  "limitations": [
+    "n=3 matched small cases, one generation per level/case; no statistical claim",
+    "fixed blocked order 1 then 2 then 3 to implement one canonical ticket at a time",
+    "first level1 trial cold cache; cannot attribute uncached-input differences to verbosity",
+    "explicit prompts matched but native input counts/host context vary",
+    "model outputs diffs without tool calls; no claim about creation, implementation, tool retries or future reads",
+    "controller preparation/validation/commits and this conversation excluded from native subject counters",
+    "output includes reasoning; cached input is a subset, not extra tokens",
+    "text tokenizers are reference estimates, not confirmed model tokenizer"
+  ]
+}
