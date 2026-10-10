@@ -1,9 +1,9 @@
 # 12: Optimizar el consumo del agente al escribir y actualizar tickets
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: agents, tickets, efficiency
 Blocked by: 01, 06
-Commits: none
+Commits: b9fba19dd324
 
 ## Estado inicial
 
@@ -36,4 +36,4 @@ El resultado es una única mejora observable del flujo de tickets: un agente nue
 
 ## Estado posterior
 
-Implementación verificada; pendiente registrar el hash real y cerrar mediante el commit posterior. Investigación y cobertura en docs/research/12-ticket-workflow-efficiency.md. Siguiente paso después del cierre: pruebas controladas de verbosity, sin atribuirles todavía ahorro total.
+Completado y verificado; implementación b9fba19dd324, registrada mediante este cierre posterior. Investigación y cobertura en docs/research/12-ticket-workflow-efficiency.md. Siguiente paso: pruebas controladas de verbosity, sin atribuirles todavía ahorro total. No se hizo push.
