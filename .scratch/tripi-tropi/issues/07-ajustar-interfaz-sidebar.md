@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68
+Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a
 
 ## Estado inicial
 
