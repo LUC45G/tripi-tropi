@@ -1,6 +1,6 @@
 # tripi-tropi
 
-A local, read-only ticket viewer for `.scratch/<feature>/issues/*.md` created with the `to-tickets` skill. Install or otherwise make `to-tickets` available in the repository if you want to create and maintain tickets; the viewer itself only reads existing Markdown files. It runs independently while your agent works. Node.js 24+ with npm and registry access are required; Codex CLI with `queue` support is optional for sending implementation requests.
+A local, read-only ticket viewer for `.scratch/<feature>/issues/*.md` created with the [`to-tickets`](https://github.com/mattpocock/skills) skill. Install or otherwise make `to-tickets` available in the repository if you want to create and maintain tickets; the viewer itself only reads existing Markdown files. It runs independently while your agent works. Node.js 24+ with npm and registry access are required; Codex CLI with `queue` support is optional for sending implementation requests.
 
 ## Install
 
@@ -22,7 +22,7 @@ The installer leaves existing installations untouched unless `--update` is suppl
 
 ## Discover and run
 
-Invoke `$tripi-tropi` in Codex and ask it to open tickets in your current repository. The viewer works even when `tripi-tropi` is not explicitly invoked: launch its script directly, or invoke another agent workflow that starts it. `to-tickets` is only needed for the ticket authoring workflow; it is not required to display existing tickets. Codex discovers user skills in `~/.agents/skills` automatically; if it does not appear, restart Codex. A custom directory must be a supported discovery location (for example `<repo>/.agents/skills`) or launched directly. See the [official Codex skill documentation](https://learn.chatgpt.com/docs/build-skills).
+Invoke `$tripi-tropi` in Codex and ask it to open tickets in your current repository. The viewer also works when `tripi-tropi` is installed but not explicitly invoked: launch its script directly, or invoke another agent workflow that starts it. `to-tickets` is only needed for the ticket authoring workflow; it is not required to display existing tickets. Codex discovers user skills in `~/.agents/skills` automatically; if it does not appear, restart Codex. A custom directory must be a supported discovery location (for example `<repo>/.agents/skills`) or launched directly. See the [official Codex skill documentation](https://learn.chatgpt.com/docs/build-skills).
 
 Direct launch from any working directory (replace the example skill path with your installation path):
 
@@ -31,6 +31,14 @@ node "/path/to/skills/tripi-tropi/scripts/launch.mjs" --repo "/path/to/my repo"
 ```
 
 The launcher opens the browser and returns immediately. Add `--no-open` to print the URL only, or `--thread "session UUID or exact name"` to enable Codex queueing. Without a linked session, browsing still works. Local network/process/browser permissions remain governed by the host environment.
+
+To check whether a viewer is already active for a repository, run the launcher again with the same repository and `--no-open`:
+
+```sh
+node "/path/to/skills/tripi-tropi/scripts/launch.mjs" --repo "/path/to/my repo" --no-open
+```
+
+It reports `reused: true` and the existing local URL when the viewer is active. If there is no active instance, it starts one and reports `reused: false`.
 
 Stop a viewer using the same repository:
 
