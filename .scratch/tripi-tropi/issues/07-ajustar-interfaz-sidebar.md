@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733
+Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68
 
 ## Estado inicial
 
@@ -43,7 +43,7 @@ Tercera entrega: encabezado del detalle organizado en tabla semántica de títul
 Cuarta entrega: botón de colapso al 100% del ancho disponible del pie y Markdown al 100% de la columna, sin máximo de 76ch. Codex muestra nombre de sesión seguido del ID muted. El servidor consulta únicamente metadatos del índice local de sesiones, de forma opcional y de solo lectura; admite líneas incompletas o un índice ausente sin afectar el visor y no cambia el destino de envío. Si no hay nombre, muestra Unnamed session. Texto insertado como contenido seguro, sin interpretar HTML. Nombre real verificado: Set up Matt Pocock skills. Verificación visual de anchos y 24 pruebas Node/Edge pasan; el 07 permanece abierto para conformidad del usuario.
 
 ## Estado posterior
-Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c y 6458e758c733. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
+Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733 y 20f4f8c58f68. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
 
 ## Comments
 
