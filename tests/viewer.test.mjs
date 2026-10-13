@@ -103,6 +103,40 @@ test('HTTP viewer isolates repositories and rejects write requests, traversal an
   }
 });
 
+test('session API accepts only indexed destinations and authenticated Exit stops only its viewer', async () => {
+  const repo = await fixture(); const before = await digest(repo);
+  const otherRepo = await mkdtemp(path.join(tmpdir(), 'tripi-tropi-other-viewer-'));
+  const registryFile = path.join(tmpdir(), `tripi-tropi-viewer-${process.pid}-${Date.now()}.json`);
+  const sessions = [{ id: 'session-one', name: 'First' }, { id: 'session-two', name: 'Second' }];
+  const viewer = await createViewer({ repo, thread: 'session-one', controlToken: 'viewer-control-token', registryFile, queueOptions: { resolveSessions: async () => sessions, resolveThreadName: async (id) => sessions.find((item) => item.id === id)?.name ?? null } });
+  const other = await createViewer({ repo: otherRepo, controlToken: 'other-viewer-token' });
+  try {
+    await writeFile(registryFile, JSON.stringify({ pid: process.pid, repo, token: 'viewer-control-token' }));
+    assert.match(await (await fetch(viewer.url)).text(), /data-control-token="viewer-control-token"/);
+    assert.deepEqual((await (await fetch(`${viewer.url}/api/sessions`)).json()).sessions, sessions);
+    const queue = await (await fetch(`${viewer.url}/api/queue`)).json();
+    const update = (session, headers = {}) => fetch(`${viewer.url}/api/session`, { method: 'POST', headers: { Origin: viewer.url, 'Content-Type': 'application/json', 'X-Queue-Token': queue.token, ...headers }, body: JSON.stringify({ session }) });
+    assert.equal((await update('session-two', { 'X-Queue-Token': 'wrong' })).status, 403);
+    assert.equal((await update('session-two', { Origin: 'http://malicious.example' })).status, 403);
+    assert.equal((await update('not-in-index')).status, 409);
+    assert.equal((await update('session-two')).status, 200);
+    assert.equal((await (await fetch(`${viewer.url}/api/health`)).json()).thread, 'session-two');
+    assert.equal((await update(null)).status, 200);
+    assert.equal((await (await fetch(`${viewer.url}/api/health`)).json()).thread, null);
+    const stopped = await fetch(`${viewer.url}/control/stop`, { method: 'POST', headers: { 'X-Viewer-Token': 'viewer-control-token' } });
+    assert.deepEqual(await stopped.json(), { stopped: true });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await assert.rejects(fetch(`${viewer.url}/api/health`));
+    await assert.rejects(readFile(registryFile));
+    assert.equal((await fetch(`${other.url}/api/health`)).status, 200);
+    assert.deepEqual(await digest(repo), before);
+  } finally {
+    await Promise.all([viewer, other].map(({ server }) => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); })));
+    await rm(registryFile, { force: true });
+    await rm(otherRepo, { recursive: true, force: true });
+  }
+});
+
 test('browser renders original Markdown and hashes, with inert checkboxes and sanitized content', { skip: !browserAvailable }, async () => {
   const repo = await fixture();
   const before = await digest(repo);
@@ -149,15 +183,30 @@ test('browser renders original Markdown and hashes, with inert checkboxes and sa
 test('detached launcher reuses same repo, separates another repo and stops only its own instance', { timeout: 30000 }, async () => {
   const first = await fixture();
   const second = await fixture();
+  const sessionsHome = await mkdtemp(path.join(tmpdir(), 'tripi-launch-sessions-'));
+  const launchEnv = { CODEX_HOME: sessionsHome };
+  await writeFile(path.join(sessionsHome, 'session_index.jsonl'), [
+    JSON.stringify({ id: 'session-one', thread_name: 'First session' }),
+    JSON.stringify({ id: 'session-two', thread_name: 'Second session' }),
+  ].join('\n'));
   try {
-    const started = await command(['--repo', first, '--no-open']);
+    const started = await command(['--repo', first, '--no-open', '--thread', 'session-one'], launchEnv);
     assert.equal(started.code, 0, started.stderr);
     const a = JSON.parse(started.stdout);
     assert.equal(a.reused, false);
-    const reused = await command(['--repo', first, '--no-open']);
+    const reused = await command(['--repo', first, '--no-open', '--thread', 'session-one'], launchEnv);
     assert.equal(reused.code, 0, reused.stderr);
     const b = JSON.parse(reused.stdout);
     assert.equal(b.reused, true); assert.equal(b.pid, a.pid); assert.equal(b.url, a.url);
+    const queue = await (await fetch(`${a.url}/api/queue`)).json();
+    const changed = await fetch(`${a.url}/api/session`, { method: 'POST', headers: { Origin: a.url, 'Content-Type': 'application/json', 'X-Queue-Token': queue.token }, body: JSON.stringify({ session: 'session-two' }) });
+    assert.equal(changed.status, 200);
+    const afterChange = await command(['--repo', first, '--no-open', '--thread', 'session-two'], launchEnv);
+    assert.equal(afterChange.code, 0, afterChange.stderr);
+    assert.equal(JSON.parse(afterChange.stdout).reused, true);
+    const staleDestination = await command(['--repo', first, '--no-open', '--thread', 'session-one'], launchEnv);
+    assert.notEqual(staleDestination.code, 0);
+    assert.match(staleDestination.stderr, /Stop it before linking a different Codex session/);
     const other = await command(['--repo', second, '--no-open']);
     assert.equal(other.code, 0, other.stderr);
     assert.notEqual(JSON.parse(other.stdout).url, a.url);
@@ -167,7 +216,7 @@ test('detached launcher reuses same repo, separates another repo and stops only 
     assert.equal((await fetch(`${JSON.parse(other.stdout).url}/api/health`)).status, 200);
   } finally {
     await command(['--repo', first, '--stop']); await command(['--repo', second, '--stop']);
-    await rm(first, { recursive: true, force: true }); await rm(second, { recursive: true, force: true });
+    await rm(first, { recursive: true, force: true }); await rm(second, { recursive: true, force: true }); await rm(sessionsHome, { recursive: true, force: true });
   }
 });
 
@@ -270,6 +319,56 @@ test('browser follows a qualified blocker to the exact feature while preserving 
     await page.waitForFunction(() => document.querySelector('#detail-path').textContent === 'feature-original/issues/02-dependent.md');
   } finally {
     await browser.close(); await new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('browser selects and unlinks Codex sessions, closes the menu accessibly and exits without closing its tab', { skip: !browserAvailable }, async () => {
+  const repo = await fixture();
+  await writeFile(path.join(repo, '.scratch/feature-original/issues/02-ready.md'), '# 02: Ready ticket\nStatus: ready-for-agent\nExecution: pending\nLabels: demo\nBlocked by: none\nCommits: none\n\n## Initial state\n### What to build\nOne outcome.\n### Atomicity\nComplete result.\n### Acceptance criteria\n- [ ] Verify.\n## Work performed\nPending.\n## Final state\nPending.\n');
+  const before = await digest(repo);
+  const sessions = [{ id: 'session-one', name: 'First session' }, { id: 'session-two', name: 'Second session' }];
+  const viewer = await createViewer({ repo, thread: 'session-one', controlToken: 'viewer-control-token', queueOptions: { resolveSessions: async () => sessions, resolveThreadName: async (id) => sessions.find((item) => item.id === id)?.name ?? null } });
+  const browser = await chromium.launch({ executablePath: browserPath, headless: true });
+  let emptyViewer;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    await page.goto(viewer.url);
+    const session = page.locator('#queue-session');
+    await page.waitForFunction(() => !document.querySelector('#queue-session').disabled);
+    await session.click();
+    await page.getByRole('menuitemradio', { name: /Second session.*session-two/ }).waitFor();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#session-menu').isHidden(), true);
+    assert.equal(await session.evaluate((node) => node === document.activeElement), true);
+    await session.click(); await page.mouse.click(20, 500);
+    assert.equal(await page.locator('#session-menu').isHidden(), true);
+    await session.click(); await page.getByRole('menuitemradio', { name: /Second session.*session-two/ }).click();
+    await page.waitForFunction(() => document.querySelector('#queue-session').textContent.includes('Second session - session-two'));
+    assert.match(await session.textContent(), /Second session - session-two/, await page.locator('#error').textContent());
+    await session.click(); await page.locator('.session-unlink').click();
+    await page.waitForFunction(() => document.querySelector('#queue-session').textContent === 'Codex: not linked');
+    assert.equal(await session.textContent(), 'Codex: not linked');
+    await page.locator('[data-feature="feature-original"]').click();
+    await page.locator('#ticket-list [data-ticket="feature-original/02-ready.md"]').click();
+    assert.equal(await page.getByRole('button', { name: 'Queue implementation', exact: true }).isDisabled(), true);
+    await page.route('**/control/stop', (route) => route.abort());
+    await page.getByRole('button', { name: 'Exit', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: 'Could not exit the viewer' }).waitFor();
+    await page.unroute('**/control/stop');
+    await page.getByRole('button', { name: 'Exit', exact: true }).click();
+    await page.getByText('Viewer stopped. This browser tab stays open.', { exact: true }).waitFor();
+    assert.equal(page.isClosed(), false);
+    emptyViewer = await createViewer({ repo, queueOptions: { resolveSessions: async () => [] } });
+    await page.goto(emptyViewer.url);
+    await page.waitForFunction(() => !document.querySelector('#queue-session').disabled);
+    await page.locator('#queue-session').click();
+    await page.getByText('No sessions are available in the local Codex index.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('menuitemradio').count(), 0);
+    assert.deepEqual(await digest(repo), before);
+  } finally {
+    await browser.close();
+    await Promise.all([viewer, emptyViewer].filter(Boolean).map(({ server }) => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); })));
     await rm(repo, { recursive: true, force: true });
   }
 });

@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 import { createQueue, queueMessage } from '../skills/tripi-tropi/scripts/queue.mjs';
 import { createViewer } from '../skills/tripi-tropi/scripts/server.mjs';
 import { loadTickets } from '../skills/tripi-tropi/scripts/tickets.mjs';
-import { readThreadName } from '../skills/tripi-tropi/scripts/thread-name.mjs';
+import { readThreadName, listCodexSessions } from '../skills/tripi-tropi/scripts/thread-name.mjs';
 
 const browserPath = process.env.TRIPI_TROPI_BROWSER ?? (process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : '');
 const browserAvailable = browserPath && existsSync(browserPath);
@@ -31,6 +31,7 @@ test('optional session display name reads the latest matching index record and t
   const home = await mkdtemp(path.join(tmpdir(), 'tripi-thread-name-'));
   try {
     assert.equal(await readThreadName('linked-id', home), null);
+    assert.deepEqual(await listCodexSessions(home), []);
     await writeFile(path.join(home, 'session_index.jsonl'), [
       JSON.stringify({ id: 'other-id', thread_name: 'Another session' }),
       JSON.stringify({ id: 'linked-id', thread_name: 'Old title' }),
@@ -39,7 +40,33 @@ test('optional session display name reads the latest matching index record and t
     ].join('\n'));
     assert.equal(await readThreadName('linked-id', home), 'Current title');
     assert.equal(await readThreadName('unknown-id', home), null);
+    assert.deepEqual(await listCodexSessions(home), [
+      { id: 'other-id', name: 'Another session' }, { id: 'linked-id', name: 'Current title' },
+    ]);
   } finally { await rm(home, { recursive: true, force: true }); }
+});
+
+test('session selection reuses only indexed IDs and keeps each destination queue ledger separate', async () => {
+  const f = await fixture(); const sent = [];
+  const sessions = [{ id: 'first-id', name: 'First session' }, { id: 'second-id', name: 'Second session' }];
+  const queue = await createQueue({ ...f, thread: 'first-id', resolveSessions: async () => sessions, resolveThreadName: async (id) => sessions.find((item) => item.id === id)?.name ?? null, deliver: async (value) => sent.push(value.thread) });
+  try {
+    assert.deepEqual(await queue.listSessions(), sessions);
+    await assert.rejects(queue.setThread({ id: 'fake' }), /Invalid Codex session/);
+    await queue.enqueue(f.tickets[0].id);
+    await queue.setThread('second-id');
+    await queue.refreshThreadName();
+    assert.equal(queue.info().thread, 'second-id');
+    assert.equal(queue.info().threadName, 'Second session');
+    assert.deepEqual(queue.info().records, {});
+    await queue.enqueue(f.tickets[0].id);
+    await queue.setThread('first-id');
+    assert.equal(queue.info().records[f.tickets[0].id].status, 'Queued');
+    assert.deepEqual(sent, ['first-id', 'second-id']);
+    await queue.setThread(null);
+    assert.equal(queue.info().thread, null);
+    assert.deepEqual(queue.info().records, {});
+  } finally { await rm(f.base, { recursive: true, force: true }); }
 });
 
 test('queue adapter passes separate arguments without shell, session creation or permission overrides', async () => {
@@ -72,6 +99,7 @@ test('queue revalidates disk state, blocks duplicates across concurrent requests
     while (!messages.length) await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(queue.info().records[f.tickets[0].id].status, 'Sending');
     assert.equal((await queue.enqueue(f.tickets[0].id)).code, 409);
+    assert.equal((await queue.setThread('other-session')).code, 409);
     release(); assert.equal((await sending).record.status, 'Queued');
     assert.match(messages[0].message, /ALL dependencies/); assert.match(messages[0].message, /atomic/);
     assert.match(messages[0].message, /Revalidated dependency list:\n- None/);

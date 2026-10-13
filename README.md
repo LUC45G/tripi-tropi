@@ -46,7 +46,7 @@ Direct launch from any working directory (replace the example skill path with yo
 node "/path/to/skills/tripi-tropi/scripts/launch.mjs" --repo "/path/to/my repo"
 ```
 
-The launcher opens the browser and returns immediately. Add `--no-open` to print the URL only, or `--thread "session UUID or exact name"` to enable Codex queueing. Without a linked session, browsing still works. Local network/process/browser permissions remain governed by the host environment.
+The launcher opens the browser and returns immediately. Add `--no-open` to print the URL only, or `--thread "session UUID or exact name"` to set the initial Codex queue destination. Without a linked session, browsing still works. In the viewer, click the Codex destination to choose an existing session from the local Codex index or unlink it. The `Exit` button stops only this viewer process and leaves the browser tab open. Local network/process/browser permissions remain governed by the host environment.
 
 To check whether a viewer is already active for a repository, run the launcher again with the same repository and `--no-open`:
 

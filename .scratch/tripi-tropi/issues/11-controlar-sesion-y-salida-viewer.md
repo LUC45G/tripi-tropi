@@ -1,6 +1,6 @@
 # 11: Controlar la sesión Codex y cerrar el viewer
 Status: ready-for-agent
-Execution: pending
+Execution: in-progress
 Labels: codex, viewer, controls
 Blocked by: 05, 06
 Commits: none
@@ -17,19 +17,19 @@ El ticket entrega una capacidad completa y observable de control operativo del v
 
 ### Criterios de aceptación
 
-- [ ] Al hacer click en la sesión del header, abrir un dropdown accesible con las sesiones disponibles del índice local, mostrando nombre e ID cuando existan.
-- [ ] Permitir seleccionar una sesión existente o dejar el viewer sin destino vinculado; el cambio actualiza el destino de queue sin crear sesiones ni cambiar permisos.
-- [ ] Cerrar el dropdown con click exterior, Escape y después de seleccionar una opción.
-- [ ] Agregar un botón `Exit` que detenga únicamente el proceso del viewer del repositorio actual mediante el control autenticado existente.
-- [ ] Mostrar una confirmación visible después del cierre y un error accionable si el proceso ya terminó o no puede cerrarse.
-- [ ] No cerrar Codex ni la pestaña del navegador, no modificar tickets y no escribir configuración del repositorio, de Codex o de otras skills.
-- [ ] Mantener el comportamiento funcional cuando no existe índice de sesiones, no hay sesiones seleccionables o el viewer se inició sin destino Codex.
-- [ ] Verificar la selección, desvinculación, cierre y casos de error en navegador y con pruebas del servidor; ejecutar la suite relevante y validar que los archivos observados no cambian.
+- [x] Al hacer click en la sesión del header, abrir un dropdown accesible con las sesiones disponibles del índice local, mostrando nombre e ID cuando existan.
+- [x] Permitir seleccionar una sesión existente o dejar el viewer sin destino vinculado; el cambio actualiza el destino de queue sin crear sesiones ni cambiar permisos.
+- [x] Cerrar el dropdown con click exterior, Escape y después de seleccionar una opción.
+- [x] Agregar un botón `Exit` que detenga únicamente el proceso del viewer del repositorio actual mediante el control autenticado existente.
+- [x] Mostrar una confirmación visible después del cierre y un error accionable si el proceso ya terminó o no puede cerrarse.
+- [x] No cerrar Codex ni la pestaña del navegador, no modificar tickets y no escribir configuración del repositorio, de Codex o de otras skills.
+- [x] Mantener el comportamiento funcional cuando no existe índice de sesiones, no hay sesiones seleccionables o el viewer se inició sin destino Codex.
+- [x] Verificar la selección, desvinculación, cierre y casos de error en navegador y con pruebas del servidor; ejecutar la suite relevante y validar que los archivos observados no cambian.
 
 ## Trabajo realizado
 
-Pendiente. El ticket 05 ya ofrece queue para la sesión vinculada y el 06 distribuye el paquete instalable. Este ticket agrega únicamente controles de la interfaz y del proceso local del viewer.
+Session control: el header lee el índice local de Codex, permite seleccionar o desvincular sesiones por ID, y conserva registros de queue separados por destino. `Exit` detiene el proceso autenticado del viewer, elimina su registro temporal coincidente y deja abierta la pestaña. README y skill actualizados; `npm test` pasa (36 pruebas) y la validación estricta informa 16 tickets sin errores ni warnings.
 
 ## Estado posterior
 
-Pendiente de implementar después de 05 y 06. La interfaz seguirá siendo de solo lectura respecto de los tickets y el viewer continuará ejecutándose separado del trabajo activo del agente.
+Pendiente de registrar el hash del commit de implementación en un commit posterior. Los controles mantienen los tickets y la configuración de Codex intactos.

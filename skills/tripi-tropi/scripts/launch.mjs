@@ -22,7 +22,7 @@ async function liveInstance(registry, repo) {
     if (url.hostname !== '127.0.0.1' || url.protocol !== 'http:' || url.pathname !== '/' || url.username || url.password) return null;
     const response = await fetch(`${record.url}/api/health`, { signal: AbortSignal.timeout(1200) });
     const health = await response.json();
-    return health.app === 'tripi-tropi' && health.protocolVersion === 1 && health.repo === repo && health.pid === record.pid ? record : null;
+    return health.app === 'tripi-tropi' && health.protocolVersion === 1 && health.repo === repo && health.pid === record.pid ? { ...record, thread: health.thread || '' } : null;
   } catch { return null; }
 }
 
@@ -72,7 +72,7 @@ async function main() {
     const descriptor = openSync(log, 'a');
     const child = spawn(process.execPath, [fileURLToPath(new URL('./server.mjs', import.meta.url))], {
       detached: true, windowsHide: true, stdio: ['ignore', descriptor, descriptor, 'ipc'],
-      env: { ...process.env, TRIPI_TROPI_REPO: repo, TRIPI_TROPI_PORT: String(port), TRIPI_TROPI_TOKEN: token, TRIPI_TROPI_THREAD: thread },
+      env: { ...process.env, TRIPI_TROPI_REPO: repo, TRIPI_TROPI_PORT: String(port), TRIPI_TROPI_TOKEN: token, TRIPI_TROPI_THREAD: thread, TRIPI_TROPI_REGISTRY: registry },
     });
     closeSync(descriptor);
     const ready = await new Promise((resolve, reject) => {

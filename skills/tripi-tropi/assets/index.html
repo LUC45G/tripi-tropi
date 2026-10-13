@@ -15,9 +15,15 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="tripi-tropi home"><img class="brand-mark" src="/icon.svg" alt="">tripi-tropi <span id="skill-version" class="version-badge" aria-label="Skill version">version</span></a>
     <span class="repo-name" id="repo-name">Local tickets</span>
-    <span class="queue-session" id="queue-session" title="No Codex session linked">Codex: not linked</span>
+    <div class="session-control">
+      <button class="queue-session" id="queue-session" type="button" title="No Codex session linked" aria-haspopup="menu" aria-expanded="false" aria-controls="session-menu" disabled>Codex: not linked</button>
+      <div class="session-menu" id="session-menu" role="menu" aria-label="Queue destination" hidden></div>
+    </div>
+    <div class="session-backdrop" id="session-backdrop" hidden></div>
     <span class="live-status" id="live-status" role="status" title="Connection for automatic updates from local files">Connecting…</span>
     <button class="refresh" id="refresh" type="button">Refresh</button>
+    <button class="refresh" id="exit-viewer" type="button" data-control-token="__VIEWER_TOKEN__">Exit</button>
+    <span id="exit-status" class="muted" role="status" hidden></span>
   </header>
   <div id="error" role="alert" hidden></div>
   <main class="workspace">

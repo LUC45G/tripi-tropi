@@ -28,7 +28,17 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .version-badge { color: var(--muted); background: #293847; border: 1px solid #415362; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: .2px; padding: 3px 7px; }
 .sidebar-toggle { min-width: 32px; font-size: 20px; padding: 3px 8px; }
 #live-status { margin-left: auto; }
-.queue-session { color: var(--text); font-size: 11px; min-width: 0; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-control { position: relative; min-width: 0; }
+.queue-session { color: var(--text); font-size: 11px; min-width: 0; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 7px; text-align: left; }
+.queue-session:hover, .queue-session[aria-expanded="true"] { background: var(--control); border-color: var(--control-border); }
+.session-menu { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: min(360px, 80vw); max-height: min(60vh, 440px); overflow: auto; padding: 6px; background: var(--panel); border: 1px solid var(--control-border); border-radius: 6px; box-shadow: 0 12px 32px #0008; }
+.session-menu[hidden] { display: none; }
+.session-backdrop:not([hidden]) { position: fixed; inset: 0; z-index: 19; background: transparent; }
+.session-menu button { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 9px 10px; border: 0; border-radius: 4px; background: transparent; text-align: left; }
+.session-menu button:hover, .session-menu button[aria-checked="true"] { background: var(--control-hover); }
+.session-option-name { font-size: 12px; overflow-wrap: anywhere; }
+.session-option-id { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.session-menu .session-unlink { margin-top: 6px; border-top: 1px solid var(--line); border-radius: 0; color: var(--muted); }
 .session-id { color: var(--muted); }
 .queue-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); margin-bottom: 20px; padding-bottom: 16px; }
 .queue-controls button { flex: 0 0 auto; }
@@ -219,7 +229,7 @@ tr.selected td { background: var(--selection); }
   .mobile-tabs button { flex: 1; padding: 9px; border: 1px solid var(--control-border); border-radius: 4px; background: var(--control); }
   .mobile-tabs button[aria-pressed="true"] { background: var(--selection); color: var(--accent); }
   .repo-name { display: none; } .topbar { gap: 10px; padding: 0 12px; } .read-only { padding-left: 8px; font-size: 11px; }
-  .queue-session { max-width: 75px; }
+  .queue-session { max-width: 90px; }
   .brand { font-size: 16px; } .brand-mark { width: 22px; height: 22px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

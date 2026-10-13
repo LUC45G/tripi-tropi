@@ -15,6 +15,7 @@ let sidebarCollapsed = false;
 let storageTimer;
 let eventSource;
 let queueInfo = { thread: null, token: '', records: {} };
+let queueReadGeneration = 0;
 const workspace = document.querySelector('.workspace');
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 async function loadSkillVersion() {
@@ -248,23 +249,97 @@ function ticketInfo(ticket) {
   return `<table class="ticket-info" aria-label="Ticket information"><tbody>${rows.map(([title, values]) => `<tr><th scope="row">${title}</th><td>${values}</td></tr>`).join('')}</tbody></table>`;
 }
 
+function renderQueueDestination() {
+  el('queue-session').replaceChildren();
+  if (queueInfo.thread) {
+    el('queue-session').append(document.createTextNode(`Codex: ${queueInfo.threadName || 'Unnamed session'} - `));
+    const id = document.createElement('span'); id.className = 'session-id'; id.textContent = queueInfo.thread;
+    el('queue-session').append(id);
+  } else el('queue-session').textContent = 'Codex: not linked';
+  el('queue-session').title = queueInfo.thread ? `Queue destination: ${queueInfo.threadName || 'Unnamed session'} - ${queueInfo.thread}` : 'No Codex session linked';
+}
+
 async function loadQueue() {
+  const generation = ++queueReadGeneration;
   try {
     const response = await fetch('/api/queue');
     if (!response.ok) throw new Error('Could not read linked session.');
-    queueInfo = await response.json();
-    el('queue-session').replaceChildren();
-    if (queueInfo.thread) {
-      el('queue-session').append(document.createTextNode(`Codex: ${queueInfo.threadName || 'Unnamed session'} - `));
-      const id = document.createElement('span'); id.className = 'session-id'; id.textContent = queueInfo.thread;
-      el('queue-session').append(id);
-    } else el('queue-session').textContent = 'Codex: not linked';
-    el('queue-session').title = queueInfo.thread ? `Queue destination: ${queueInfo.threadName || 'Unnamed session'} - ${queueInfo.thread}` : 'No Codex session linked';
+    const info = await response.json();
+    if (generation !== queueReadGeneration) return;
+    queueInfo = info;
+    el('queue-session').disabled = false;
+    renderQueueDestination();
   } catch {
+    if (generation !== queueReadGeneration) return;
     queueInfo = { thread: null, token: '', records: {} };
+    el('queue-session').disabled = true;
     el('queue-session').textContent = 'Codex: unavailable';
+    el('queue-session').title = 'The queue destination could not be read.';
   }
 }
+
+function closeSessionMenu({ focus = false } = {}) {
+  el('session-menu').hidden = true;
+  el('session-backdrop').hidden = true;
+  el('queue-session').setAttribute('aria-expanded', 'false');
+  if (focus) el('queue-session').focus();
+}
+
+async function openSessionMenu() {
+  const menu = el('session-menu');
+  menu.hidden = false; el('session-backdrop').hidden = false; el('queue-session').setAttribute('aria-expanded', 'true');
+  menu.innerHTML = '<p class="muted">Loading sessions…</p>';
+  try {
+    const response = await fetch('/api/sessions');
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? 'Could not read Codex sessions.');
+    const options = result.sessions.map((session) => `<button type="button" role="menuitemradio" data-session="${escapeHTML(session.id)}" aria-checked="${session.id === queueInfo.thread}"><span class="session-option-name">${escapeHTML(session.name || 'Unnamed session')}</span><span class="session-option-id">${escapeHTML(session.id)}</span></button>`);
+    if (!options.length) options.push('<p class="muted session-empty">No sessions are available in the local Codex index.</p>');
+    options.push(`<button type="button" role="menuitem" class="session-unlink" data-session="">Unlink session</button>`);
+    menu.innerHTML = options.join('');
+  } catch (error) { menu.innerHTML = `<p class="error-text">${escapeHTML(error.message)}</p><button type="button" role="menuitem" class="session-unlink" data-session="">Unlink session</button>`; }
+  menu.querySelector('[data-session]')?.focus({ preventScroll: true });
+}
+
+async function selectQueueSession(session) {
+  const button = [...el('session-menu').querySelectorAll('[data-session]')].find((option) => option.dataset.session === session);
+  if (button) button.disabled = true;
+  try {
+    const response = await fetch('/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Queue-Token': queueInfo.token }, body: JSON.stringify({ session: session || null }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? 'Could not change queue destination.');
+    queueReadGeneration++;
+    queueInfo = result; renderQueueDestination(); closeSessionMenu({ focus: true }); render();
+  } catch (error) {
+    el('error').textContent = `Could not change queue destination. ${error.message}`; el('error').hidden = false;
+    closeSessionMenu();
+  }
+}
+
+el('queue-session').addEventListener('click', () => {
+  if (el('session-menu').hidden) openSessionMenu(); else closeSessionMenu();
+});
+el('session-menu').addEventListener('click', (event) => {
+  const option = event.target.closest('[data-session]');
+  if (option) selectQueueSession(option.dataset.session);
+});
+el('session-backdrop').addEventListener('click', () => closeSessionMenu());
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.session-control')) closeSessionMenu();
+});
+el('exit-viewer').addEventListener('click', async () => {
+  const button = el('exit-viewer'); button.disabled = true; button.textContent = 'Exiting…';
+  try {
+    const response = await fetch('/control/stop', { method: 'POST', headers: { 'X-Viewer-Token': button.dataset.controlToken } });
+    const result = await response.json();
+    if (!response.ok || result.stopped !== true) throw new Error(result.error ?? 'The viewer process did not confirm shutdown.');
+    el('exit-status').textContent = 'Viewer stopped. This browser tab stays open.'; el('exit-status').hidden = false;
+    button.textContent = 'Exited';
+  } catch (error) {
+    el('error').textContent = `Could not exit the viewer. It may already be stopped; check the local process and try launching again. ${error.message}`; el('error').hidden = false;
+    button.disabled = false; button.textContent = 'Exit';
+  }
+});
 
 function render() {
   const scroll = scrollPositions();
@@ -404,6 +479,7 @@ document.addEventListener('click', (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape') return;
+  if (!el('session-menu').hidden) { closeSessionMenu({ focus: true }); return; }
   for (const dropdown of dropdowns) if (dropdown.open) { dropdown.open = false; dropdown.querySelector('summary').focus(); }
 });
 el('label-options').addEventListener('change', (event) => {
