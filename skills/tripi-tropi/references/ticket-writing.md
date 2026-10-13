@@ -18,7 +18,7 @@ Separate metadata lines follow the title:
 - `Status:` triage (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), using repository mappings.
 - `Execution:` `pending`, `in-progress`, `blocked`, `completed`, `discarded`.
 - `Labels:` comma-separated labels or `none`.
-- `Blocked by:` same-feature ticket numbers or `none`.
+- `Blocked by:` same-feature ticket numbers, exact cross-feature references like `authentication:02`, or `none`.
 - `Commits:` real implementation hashes, 7–12 hex characters, or `none`.
 - `Verbosity:` `1` (Minimal, default) or `2` (Detailed); omitted in existing tickets means `1`.
 
