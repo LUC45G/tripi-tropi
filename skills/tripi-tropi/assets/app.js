@@ -133,7 +133,7 @@ function updateFilterControls() {
 function dependencyList(ticket) {
   if (!ticket.dependencies?.length) return '<p class="muted dependency-empty">No ticket dependencies declared.</p>';
   return `<ul class="dependencies">${ticket.dependencies.map((dependency) => {
-    const name = `${String(dependency.number).padStart(2, '0')}${dependency.title ? ` · ${dependency.title}` : ''}`;
+    const name = `${dependency.feature !== ticket.feature ? `${dependency.feature} · ` : ''}${String(dependency.number).padStart(2, '0')}${dependency.title ? ` · ${dependency.title}` : ''}`;
     const content = `<span class="dependency-name">${escapeHTML(name)}</span><span class="dependency-status">${stateChip(dependency.state)}<span>${dependency.problem ? escapeHTML(dependency.problem) : dependency.satisfied ? 'Resolved' : 'Blocks this ticket'}</span></span>`;
     return `<li>${dependency.id ? `<button class="dependency-link ${dependency.satisfied ? 'dependency-resolved' : 'dependency-pending'}" data-ticket="${escapeHTML(dependency.id)}">${content}</button>` : `<div class="dependency-link dependency-invalid">${content}</div>`}</li>`;
   }).join('')}</ul>`;

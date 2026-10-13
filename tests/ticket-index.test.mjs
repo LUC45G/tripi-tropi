@@ -35,7 +35,7 @@ test('progressively disclosed creation template preserves strict format and depe
     const ticket = parseTicket(template, { feature: 'demo', filename: '05-template.md', strict: true });
     assert.deepEqual(ticket.diagnostics, []);
     assert.equal(ticket.execution, 'pending');
-    assert.deepEqual(ticket.blockers, [3, 4]);
+    assert.deepEqual(ticket.blockers, [{ feature: 'demo', number: 3 }, { feature: 'demo', number: 4 }, { feature: 'authentication', number: 2 }]);
     assert.deepEqual(ticket.progress, { checked: 0, total: 1 });
   });
 });
@@ -51,7 +51,7 @@ test('discovery preserves metadata, roundtrips escaped cells, filters after deri
     const original = await readFile(second, 'utf8');
     const blocked = await ticketIndex(repo, { feature: 'demo', state: 'Blocked' });
     assert.equal(blocked.tickets.length, 1); assert.equal(blocked.tickets[0].id, 'demo/02-second.md');
-    assert.deepEqual(JSON.parse(blocked.tickets[0].blockers), [1]);
+    assert.deepEqual(JSON.parse(blocked.tickets[0].blockers), [{ feature: 'demo', number: 1 }]);
     assert.deepEqual(decode(encode(blocked)), blocked);
     assert.equal(blocked.tickets[0].title, 'Texto, "quoted" y Unicode ñ');
     assert.deepEqual(JSON.parse(blocked.tickets[0].labels), ['backend', '"quoted"', 'ready-for-agent']);

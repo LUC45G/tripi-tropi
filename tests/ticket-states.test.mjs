@@ -69,6 +69,25 @@ test('custom triage labels retain spelling and resolve to canonical approval rol
   } finally { await rm(repo, { recursive: true, force: true }); }
 });
 
+test('cross-feature blockers resolve by exact feature and gate the dependent ticket', async () => {
+  const repo = await mkdtemp(path.join(tmpdir(), 'tripi-cross-state-'));
+  try {
+    for (const feature of ['front-end', 'back-end']) await mkdir(path.join(repo, '.scratch', feature, 'issues'), { recursive: true });
+    const body = (title, execution, blocker, commits, checked = ' ') => `# 01: ${title}\nStatus: ready-for-agent\nExecution: ${execution}\nLabels: none\nBlocked by: ${blocker}\nCommits: ${commits}\n\n## Initial state\n### What to build\nDeliver ${title}.\n### Atomicity\nOne complete result.\n### Acceptance criteria\n- [${checked}] Verify.\n## Work performed\nRecorded.\n## Final state\nReady.\n`;
+    await writeFile(path.join(repo, '.scratch/front-end/issues/01-ticket.md'), body('Frontend', 'pending', 'back-end:01', 'none'));
+    await writeFile(path.join(repo, '.scratch/back-end/issues/01-ticket.md'), body('Backend', 'completed', 'none', 'abcdef123456', 'x'));
+    const data = await loadTickets(repo, { strict: true });
+    const result = deriveTicketStates(data.tickets);
+    const frontend = result.find((item) => item.feature === 'front-end');
+    assert.equal(frontend.displayState, 'Ready to implement');
+    assert.equal(frontend.dependencies[0].id, 'back-end/01-ticket.md');
+    assert.equal(frontend.dependencies[0].feature, 'back-end');
+    await writeFile(path.join(repo, '.scratch/back-end/issues/01-ticket.md'), body('Backend', 'pending', 'none', 'none'));
+    const pending = deriveTicketStates((await loadTickets(repo)).tickets);
+    assert.equal(pending.find((item) => item.feature === 'front-end').displayState, 'Blocked');
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
 test('fixtures matching qr-wedding yield agreed frontier and state counts', () => {
   const blockedBy = { 4: '3', 5: '4', 6: '5', 7: '6', 8: '7', 9: '7', 10: '5', 11: '7', 12: '9 — Cupos, autorizaciones y reintentos; 11 — Reveal', 13: '8, 10, 12' };
   const completed = new Set([3, 4, 5, 6, 10]);

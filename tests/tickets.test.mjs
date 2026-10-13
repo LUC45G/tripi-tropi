@@ -35,7 +35,7 @@ test('qr-wedding variants retain unnumbered titles and parse multiple dependenci
   assert.equal(unnumbered.number, 1);
   assert.equal(unnumbered.title, 'Diseñar página 404');
   const ticket = parse('# 12: Prueba\nStatus: ready-for-agent\nBlocked by: 09 — Cupos, autorizaciones y reintentos; 11 — Reveal.\n- [ ] Verificar', 12);
-  assert.deepEqual(ticket.blockers, [9, 11]);
+  assert.deepEqual(ticket.blockers, [{ feature: 'demo', number: 9 }, { feature: 'demo', number: 11 }]);
   assert.deepEqual(parse('# 14: Admin\nStatus: needs-triage\nBlocked by: Ninguno para definir el diseño; integración posterior.', 14).blockers, []);
 });
 
@@ -64,6 +64,32 @@ test('graph validation handles missing/ambiguous references, self edges and ever
   validateGraph(duplicates);
   assert.ok(codes(duplicates[0]).includes('duplicate-number'));
   assert.ok(codes(duplicates[2]).includes('ambiguous-dependency'));
+});
+
+test('cross-feature references resolve by exact feature and number, parse long comma lists and detect cross-feature cycles', async () => {
+  const repo = await mkdtemp(path.join(tmpdir(), 'tripi-cross-feature-'));
+  const write = async (feature, number, blocker) => {
+    const directory = path.join(repo, '.scratch', feature, 'issues');
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, `${String(number).padStart(2, '0')}-ticket.md`), canonical(number, { 'Blocked by': blocker }));
+  };
+  try {
+    await write('same-a', 1, 'same-b:01'); await write('same-a', 2, 'none');
+    await write('same-a', 3, 'none'); await write('same-a', 4, 'none');
+    await write('same-a', 5, 'same-b:01, 02, 03, 04');
+    await write('same-b', 1, 'same-a:05');
+    const loaded = await loadTickets(repo, { strict: true });
+    const ticket = loaded.tickets.find((item) => item.feature === 'same-a' && item.number === 5);
+    assert.deepEqual(ticket.blockers, [
+      { feature: 'same-b', number: 1 }, { feature: 'same-a', number: 2 },
+      { feature: 'same-a', number: 3 }, { feature: 'same-a', number: 4 },
+    ]);
+    assert.ok(ticket.diagnostics.some((item) => item.code === 'dependency-cycle'));
+    assert.ok(loaded.tickets.find((item) => item.feature === 'same-b').diagnostics.some((item) => item.code === 'dependency-cycle'));
+    await write('same-a', 6, 'missing-feature:99');
+    const updated = await loadTickets(repo, { strict: true });
+    assert.ok(updated.tickets.find((item) => item.number === 6).diagnostics.some((item) => item.code === 'missing-feature'));
+  } finally { await rm(repo, { recursive: true, force: true }); }
 });
 
 test('loader and CLI read complete features without altering observed files', async () => {

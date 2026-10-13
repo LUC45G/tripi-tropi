@@ -81,9 +81,9 @@ export function parseTicket(content, { feature, filename, strict = false, triage
   const blockers = [];
   if (dependencyText && !absent(dependencyText)) {
     // Commas inside a title are prose; only split before another numeric reference.
-    for (const part of dependencyText.split(/;|,(?=\s*(?:#|ticket\s+)?\d+(?:$|[\s:—–-]))/i)) {
-      const match = part.trim().match(/^(?:#|ticket\s+)?(\d+)(?=$|[\s:—–-])/i);
-      if (match && Number(match[1]) > 0) blockers.push(Number(match[1]));
+    for (const part of dependencyText.split(/;|,(?=\s*(?:#|ticket\s+)?(?:[a-z\d][a-z\d._-]*:)?\d+(?:$|\s|[:,—–-]))/i)) {
+      const match = part.trim().match(/^(?:#|ticket\s+)?(?:(?<feature>[a-z\d][a-z\d._-]*):)?(?<number>\d+)(?=$|[\s:—–-])/i);
+      if (match && Number(match.groups.number) > 0) blockers.push({ feature: match.groups.feature ?? feature, number: Number(match.groups.number) });
       else report('invalid-dependency', `Cannot resolve dependency: ${part.trim()}.`);
     }
   }
@@ -97,7 +97,7 @@ export function parseTicket(content, { feature, filename, strict = false, triage
   }
   if (!total) report('missing-acceptance', 'No acceptance checkboxes found.', strict ? 'error' : 'warning');
   return { id: `${feature}/${filename}`, feature, filename, number, title, status, execution, triageRole: Object.hasOwn(triageRoles, status) ? triageRoles[status] : null,
-    labels: [...new Set(labels)], commits: [...new Set(commits)], blockers: [...new Set(blockers)],
+    labels: [...new Set(labels)], commits: [...new Set(commits)], blockers: blockers.filter((item, index) => blockers.findIndex((other) => other.feature === item.feature && other.number === item.number) === index),
     progress: { checked, total }, content, metadata, diagnostics };
 }
 
@@ -113,11 +113,11 @@ export function validateGraph(tickets) {
   const adjacency = new Map();
   for (const ticket of tickets) {
     const edges = [];
-    for (const number of ticket.blockers) {
-      const candidates = groups.get(`${ticket.feature}:${number}`) ?? [];
-      if (number === ticket.number) error(ticket, 'self-dependency', 'Ticket cannot depend on itself.');
-      else if (!candidates.length) error(ticket, 'missing-dependency', `Dependency ${number} does not exist in this feature.`);
-      else if (candidates.length > 1) error(ticket, 'ambiguous-dependency', `Dependency ${number} is ambiguous.`);
+    for (const reference of ticket.blockers) {
+      const candidates = groups.get(`${reference.feature}:${reference.number}`) ?? [];
+      if (reference.feature === ticket.feature && reference.number === ticket.number) error(ticket, 'self-dependency', 'Ticket cannot depend on itself.');
+      else if (!candidates.length) error(ticket, 'missing-dependency', `Dependency ${reference.feature}:${reference.number} does not exist.`);
+      else if (candidates.length > 1) error(ticket, 'ambiguous-dependency', `Dependency ${reference.feature}:${reference.number} is ambiguous.`);
       else edges.push(candidates[0]);
     }
     adjacency.set(ticket, edges);
@@ -196,6 +196,10 @@ export async function loadTickets(repo, { strict = false, feature } = {}) {
   }
   tickets.sort((a, b) => a.feature.localeCompare(b.feature) || a.number - b.number || a.filename.localeCompare(b.filename));
   features.sort((a, b) => a.name.localeCompare(b.name));
+  const featureNames = new Set(features.map((item) => item.name));
+  for (const ticket of tickets) for (const reference of ticket.blockers) {
+    if (!featureNames.has(reference.feature)) ticket.diagnostics.push({ severity: 'error', code: 'missing-feature', message: `Dependency feature ${reference.feature} does not exist.` });
+  }
   validateGraph(tickets);
   return { tickets, features, diagnostics, triageRoles };
 }

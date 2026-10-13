@@ -11,7 +11,7 @@ Mandatory when adopted by repository instructions. Markdown lives at `.scratch/<
 
 ## Atomicity and metadata
 
-One ticket delivers one complete observable result, acceptance criteria and an explicit `Atomicidad` / `Atomicity` explanation. Review before publishing and starting: dependencies gate the entire ticket. Preparation → another ticket → finishing preparation requires three tickets; partial dependencies are forbidden.
+One ticket delivers one complete observable result, acceptance criteria and an explicit `Atomicidad` / `Atomicity` explanation. Dependencies gate the entire ticket. Every ticket must be atomic: no work may require stopping it partway, implementing a dependency, and resuming it; split that sequence into complete tickets before implementation. Same-feature references use a number (`03`); cross-feature references use the exact feature slug and number (`authentication:02`). Never rely on partial feature-name matches. Preparation → another ticket → finishing preparation requires three tickets; partial dependencies are forbidden.
 
 Separate metadata lines follow the title:
 

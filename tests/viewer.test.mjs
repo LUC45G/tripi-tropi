@@ -244,3 +244,32 @@ test('browser filters use label OR and status AND and navigate to blockers outsi
     await rm(repo, { recursive: true, force: true });
   }
 });
+
+test('browser follows a qualified blocker to the exact feature while preserving filters', { skip: !browserAvailable }, async () => {
+  const repo = await fixture();
+  const feature = path.join(repo, '.scratch/other-feature/issues');
+  await mkdir(feature, { recursive: true });
+  const ticket = (number, title, execution, dependency, commit) => `# ${number}: ${title}\nStatus: ready-for-agent\nExecution: ${execution}\nLabels: viewer\nBlocked by: ${dependency}\nCommits: ${commit}\n\n## Initial state\n### What to build\nDeliver ${title}.\n### Atomicity\nOne complete result.\n### Acceptance criteria\n- [x] Verify.\n## Work performed\nRecorded.\n## Final state\nReady.\n`;
+  await writeFile(path.join(feature, '01-original.md'), ticket('01', 'Other feature', 'pending', 'none', 'none'));
+  const source = path.join(repo, '.scratch/feature-original/issues/02-dependent.md');
+  await writeFile(source, ticket('02', 'Dependent ticket', 'pending', 'other-feature:01', 'none'));
+  const viewer = await createViewer({ repo });
+  const browser = await chromium.launch({ executablePath: browserPath, headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    await page.goto(viewer.url);
+    await page.getByRole('button', { name: 'Dependent ticket', exact: true }).click();
+    assert.equal(await page.locator('#detail .ticket-meta .state').textContent(), 'Blocked');
+    assert.match(await page.locator('.dependency-link').first().textContent(), /other-feature.*01.*Other feature/s);
+    await page.locator('.dependency-link[data-ticket]').first().click();
+    assert.equal(await page.locator('#detail-path').textContent(), 'other-feature/issues/01-original.md');
+    assert.equal(await page.locator('#detail-kind').textContent(), 'Ticket 01');
+    assert.equal(await page.locator('#detail .markdown h1').textContent(), '01: Other feature');
+    assert.equal(new URL(page.url()).searchParams.get('feature'), 'other-feature');
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('#detail-path').textContent === 'feature-original/issues/02-dependent.md');
+  } finally {
+    await browser.close(); await new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
+    await rm(repo, { recursive: true, force: true });
+  }
+});

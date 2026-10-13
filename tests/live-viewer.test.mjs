@@ -78,6 +78,30 @@ test('watcher observes a newly created tree, atomic saves, dependencies, config,
   } finally { await stream.close(); await rm(repo, { recursive: true, force: true }); }
 });
 
+test('watcher recalculates a cross-feature dependency when its target changes or disappears', async () => {
+  const repo = await mkdtemp(path.join(tmpdir(), 'tripi-live-cross-feature-'));
+  const sourceIssues = path.join(repo, '.scratch/feature-a/issues');
+  const targetIssues = path.join(repo, '.scratch/feature-b/issues');
+  await mkdir(sourceIssues, { recursive: true }); await mkdir(targetIssues, { recursive: true });
+  const source = path.join(sourceIssues, '01-source.md'); const target = path.join(targetIssues, '01-target.md');
+  await writeFile(source, ticket('01', 'pending', 'feature-b:01'));
+  await writeFile(target, ticket('01', 'completed'));
+  const stream = await createSnapshotStream(repo);
+  try {
+    const current = () => stream.snapshot().tickets.find((item) => item.feature === 'feature-a');
+    assert.equal(current().displayState, 'Ready to implement');
+    assert.equal(current().dependencies[0].id, 'feature-b/01-target.md');
+    await writeFile(target, ticket('01', 'pending'));
+    await until(() => current().displayState === 'Blocked');
+    const renamed = path.join(targetIssues, '01-renamed.md');
+    await rename(target, renamed);
+    await until(() => current().dependencies[0].id === 'feature-b/01-renamed.md');
+    await rm(renamed);
+    await until(() => current().dependencies[0].id === null);
+    assert.equal(current().displayState, 'Blocked');
+  } finally { await stream.close(); await rm(repo, { recursive: true, force: true }); }
+});
+
 test('live browser preserves workspace, navigates history, reconnects and falls back after deletion', { skip: !browserAvailable }, async () => {
   const repo = await mkdtemp(path.join(tmpdir(), 'tripi-live-browser-'));
   const issues = path.join(repo, '.scratch/original/issues');

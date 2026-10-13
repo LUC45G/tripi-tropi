@@ -74,6 +74,7 @@ test('queue revalidates disk state, blocks duplicates across concurrent requests
     assert.equal((await queue.enqueue(f.tickets[0].id)).code, 409);
     release(); assert.equal((await sending).record.status, 'Queued');
     assert.match(messages[0].message, /ALL dependencies/); assert.match(messages[0].message, /atomic/);
+    assert.match(messages[0].message, /Revalidated dependency list:\n- None/);
     assert.match(messages[0].message, /at least one implementation commit/); assert.match(messages[0].message, /Commits/);
     assert.equal(await readFile(first, 'utf8'), original);
     const restarted = await createQueue({ ...f, thread: 'test-session', deliver });
@@ -103,6 +104,22 @@ test('HTTP queue requires exact origin and token and only accepts ticket identif
     assert.equal(messages.length, 1);
     assert.match(await readFile(path.join(f.issues, '01-queue.md'), 'utf8'), /Execution: pending/);
   } finally { await stop(viewer); await rm(f.base, { recursive: true, force: true }); }
+});
+
+test('queued cross-feature ticket names every revalidated dependency in the agent instruction', async () => {
+  const f = await fixture(); const messages = [];
+  const externalIssues = path.join(f.repo, '.scratch/external/issues');
+  await mkdir(externalIssues, { recursive: true });
+  await writeFile(path.join(externalIssues, '01-external.md'), ticket('01', 'ready-for-agent', 'none').replace('Queue ticket 01', 'External prerequisite').replace('Execution: pending', 'Execution: completed').replace('Commits: none', 'Commits: abcdef123456'));
+  const dependent = path.join(f.issues, '04-cross-feature.md');
+  await writeFile(dependent, ticket('04', 'ready-for-agent', 'external:01').replace('Queue ticket 04', 'Cross-feature delivery'));
+  const data = await loadTickets(f.repo);
+  const selected = data.tickets.find((item) => item.filename === '04-cross-feature.md');
+  const queue = await createQueue({ ...f, thread: 'session', deliver: async ({ message }) => messages.push(message) });
+  try {
+    assert.equal((await queue.enqueue(selected.id)).code, 200);
+    assert.match(messages[0], /external:01 — External prerequisite \[Completed\]/);
+  } finally { await rm(f.base, { recursive: true, force: true }); }
 });
 
 test('browser displays linked destination, Sending and Queued separately from execution', { skip: !browserAvailable }, async () => {

@@ -24,8 +24,8 @@ export function deriveTicketStates(tickets) {
   for (const ticket of tickets) {
     const base = bases.get(ticket.id);
     const dependencyErrors = ticket.diagnostics.some((item) => item.severity === 'error' && ['missing-dependency', 'ambiguous-dependency', 'self-dependency', 'dependency-cycle', 'invalid-dependency'].includes(item.code));
-    const incomplete = ticket.blockers.some((number) => {
-      const targets = groups.get(`${ticket.feature}:${number}`) ?? [];
+    const incomplete = ticket.blockers.some((reference) => {
+      const targets = groups.get(`${reference.feature}:${reference.number}`) ?? [];
       return targets.length !== 1 || bases.get(targets[0].id) !== 'Completed';
     });
     const errors = ticket.diagnostics.some((item) => item.severity === 'error');
@@ -39,12 +39,13 @@ export function deriveTicketStates(tickets) {
   return tickets.map((ticket) => ({
     ...ticket,
     displayState: states.get(ticket.id),
-    dependencies: ticket.blockers.map((number) => {
-      const targets = groups.get(`${ticket.feature}:${number}`) ?? [];
-      const self = number === ticket.number;
+    dependencies: ticket.blockers.map((reference) => {
+      const { feature, number } = reference;
+      const targets = groups.get(`${feature}:${number}`) ?? [];
+      const self = feature === ticket.feature && number === ticket.number;
       const target = !self && targets.length === 1 ? targets[0] : null;
       return {
-        number, id: target?.id ?? null, title: target?.title ?? null,
+        feature, number, id: target?.id ?? null, title: target?.title ?? null,
         state: target ? states.get(target.id) : 'Invalid reference',
         satisfied: target ? bases.get(target.id) === 'Completed' : false,
         problem: self ? 'Self dependency' : targets.length === 0 ? 'Ticket not found' : targets.length > 1 ? 'Ambiguous ticket number' : null,
