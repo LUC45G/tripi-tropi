@@ -124,6 +124,7 @@ test('queue revalidates disk state, blocks duplicates across concurrent requests
     assert.match(messages[0].message, /ALL dependencies/); assert.match(messages[0].message, /atomic/);
     assert.match(messages[0].message, /Revalidated dependency list:\n- None/);
     assert.match(messages[0].message, /at least one implementation commit/); assert.match(messages[0].message, /Commits/);
+    assert.doesNotMatch(messages[0].message, /Queued for the next turn: do not interrupt current work/);
     assert.equal(await readFile(first, 'utf8'), original);
     const restarted = await createQueue({ ...f, thread: 'test-session', deliver });
     assert.equal((await restarted.enqueue(f.tickets[0].id)).code, 409);

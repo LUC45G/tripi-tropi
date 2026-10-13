@@ -305,6 +305,7 @@ async function openSessionMenu() {
       const detail = [folder, date].filter(Boolean).join(' · ');
       return `<button type="button" role="menuitemradio" data-session="${escapeHTML(session.id)}" aria-checked="${session.id === queueInfo.thread}" title="${escapeHTML(session.cwd || 'Project folder unavailable')}"><span class="session-option-name">${escapeHTML(session.name || 'Unnamed session')}${escapeHTML(origin)}</span><span class="session-option-meta">${escapeHTML(detail)}</span><span class="session-option-id">${escapeHTML(session.id)}</span></button>`;
     });
+    options.unshift('<div class="provider-status" role="note"><strong>Codex</strong><p>Claude queueing requires an interactive terminal. OpenCode’s async API does not guarantee delivery to a busy session. Only Codex is enabled here.</p></div>');
     if (!sessions.length) options.push(`<p class="muted session-empty">${result.sessions.length ? 'No user sessions found.' : 'No sessions are available in the local Codex index.'}</p>`);
     if (toggle) options.unshift(toggle);
     options.push(`<button type="button" role="menuitem" class="session-unlink" data-session="">Unlink session</button>`);

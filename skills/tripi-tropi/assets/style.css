@@ -33,6 +33,9 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .queue-session:hover, .queue-session[aria-expanded="true"] { background: var(--control); border-color: var(--control-border); }
 .session-menu { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: min(360px, 80vw); max-height: min(60vh, 440px); overflow: auto; padding: 6px; background: var(--panel); border: 1px solid var(--control-border); border-radius: 6px; box-shadow: 0 12px 32px #0008; }
 .session-menu[hidden] { display: none; }
+.provider-status { padding: 10px; border-bottom: 1px solid var(--line); }
+.provider-status strong { font-size: 11px; }
+.provider-status p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .session-backdrop:not([hidden]) { position: fixed; inset: 0; z-index: 19; background: transparent; }
 .session-menu button { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 9px 10px; border: 0; border-radius: 4px; background: transparent; text-align: left; }
 .session-menu button:hover, .session-menu button[aria-checked="true"] { background: var(--control-hover); }

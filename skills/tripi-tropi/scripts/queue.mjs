@@ -39,7 +39,7 @@ Re-read the full ticket and ALL dependencies from disk; validate before starting
 ${dependencies}
 Proceed only if pending, ready-for-agent, every dependency is completed and the ticket is atomic. Stop if claimed/completed, no longer ready or requiring interleaving.
 Implement and verify only this ticket. Follow the guide for incremental execution/work/final records, at least one implementation commit identifying feature and number, and real hashes in Commits via a subsequent ticket-record commit. Never invent hashes or push without an explicit request.
-Queued for the next turn: do not interrupt current work. Queued does not mean started or completed.`;
+Queued does not mean started or completed.`;
 }
 
 export async function createQueue({ repo, thread = '', deliver = queueMessage, stateDirectory = path.join(tmpdir(), 'tripi-tropi'), resolveThreadName = readThreadName, resolveSessions = listCodexSessions }) {

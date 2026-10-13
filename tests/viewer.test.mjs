@@ -341,6 +341,9 @@ test('browser selects and unlinks Codex sessions, closes the menu accessibly and
     const session = page.locator('#queue-session');
     await page.waitForFunction(() => !document.querySelector('#queue-session').disabled);
     await session.click();
+    await page.getByText('Only Codex is enabled here.').waitFor();
+    assert.match(await page.locator('#session-menu').textContent(), /Only Codex is enabled here/);
+    assert.match(await page.locator('#session-menu').textContent(), /OpenCode’s async API does not guarantee delivery/);
     await page.getByRole('menuitemradio', { name: /Second session.*session-two/ }).waitFor();
     assert.match(await page.locator('#session-menu').textContent(), /second-project/);
     assert.equal(await page.getByRole('menuitemradio', { name: /Guardian review/ }).count(), 0);
