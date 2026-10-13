@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -97,6 +97,7 @@ test('queue adapter passes separate arguments without shell, session creation or
   await queueMessage({ thread: 'exact session name', message: 'Text with "quotes" and $(commands)', repo: process.cwd(), spawnProcess });
   assert.deepEqual(calls[0][1], ['queue', '--thread', 'exact session name', '--message', 'Text with "quotes" and $(commands)']);
   assert.equal(calls[0][2].shell, false); assert.equal(calls[0][2].windowsHide, true);
+  assert.equal(calls[0][2].env.CODEX_HOME, process.env.CODEX_HOME || path.join(homedir(), '.codex'));
   const failed = () => { const child = new EventEmitter(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); process.nextTick(() => { child.stderr.write('session unavailable'); child.emit('close', 1); }); return child; };
   await assert.rejects(queueMessage({ thread: 'test', message: 'test', repo: process.cwd(), spawnProcess: failed }), /session unavailable/);
 });

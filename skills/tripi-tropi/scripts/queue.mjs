@@ -4,14 +4,16 @@ import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { loadTickets } from './tickets.mjs';
 import { deriveTicketStates } from './ticket-states.mjs';
 import { readThreadName, listCodexSessions } from './thread-name.mjs';
 
 export function queueMessage({ thread, message, repo, spawnProcess = spawn, timeout = 30000 }) {
   return new Promise((resolve, reject) => {
+    const codexHome = process.env.CODEX_HOME || path.join(homedir(), '.codex');
     const child = spawnProcess('codex', ['queue', '--thread', thread, '--message', message], {
-      cwd: repo, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: repo, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CODEX_HOME: codexHome },
     });
     let stderr = '';
     child.stdout.resume();
