@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a, 7b26ad6251d8
+Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a, 7b26ad6251d8, 24a61004967d
 
 ## Estado inicial
 
@@ -33,6 +33,8 @@ Entrega completa de presentación y navegación de la sidebar, después del 04, 
 - [x] Mostrar la ruta del repositorio en el header con una barra inicial para identificarla como directorio.
 - [x] Mostrar solo el título de la feature en su encabezado, eliminando el contador textual que aparece junto al nombre.
 - [x] Al clickear una dependencia dentro de un ticket, desplazar la lista de la mitad izquierda hasta ese ticket cuando pertenece a la misma feature.
+- [x] En el selector Codex, mostrar por defecto las sesiones de usuario (`thread_source: user`), ordenadas por actividad reciente; permitir mostrar el resto y mantener accesible el destino actualmente vinculado.
+- [x] Mostrar el proyecto/carpeta y fecha de actividad en cada opción, leyendo `cwd` y `thread_source` de los metadatos locales de sesión sin modificar archivos de Codex.
 
 ## Trabajo realizado
 Marca SVG compartida con favicon, textos eliminados y cursores de resize según orientación. Botón accesible con aria-expanded para colapsar/expandir la sidebar, preferencia por repositorio y ancho conservado. Live tiene descripción de su conexión para actualizaciones automáticas. Pruebas de navegador verifican identidad, ausencia de textos, cursores, colapso, recarga y restauración de ancho; las pruebas en vivo siguen pasando.
@@ -53,11 +55,17 @@ Quinta entrega implementada: la sidebar muestra el porcentaje de tickets Complet
 
 Corrección posterior: el desplazamiento de una dependencia ahora centra la fila destino en la mitad izquierda en lugar de usar un desplazamiento mínimo, que podía dejar el ticket cortado al subir. Las pruebas de viewer y navegador pasan 6/6.
 
+Selector Codex: las sesiones se ordenan por actividad reciente; se muestra carpeta, fecha e ID. Por defecto aparecen las sesiones `user`, con acceso opcional al índice completo. Se leen metadatos locales sin escribirlos. `npm test`: 37/37; validación estricta: 13 tickets sin errores ni warnings.
+
 ## Estado posterior
 Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733 y 20f4f8c58f68. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
+
+La última entrega agrega sesiones ordenadas por actividad reciente, carpeta/proyecto visible y filtro inicial por origen de usuario con opción de mostrar el resto. La UI fue verificada en navegador; el ticket sigue in-progress hasta la conformidad explícita del usuario.
 
 ## Comments
 
 El usuario agregó consistencia y títulos para dropdowns, cierre al hacer clic afuera, Clear filters explícito y eliminación del contador textual duplicado. Solicitó mover el control de colapso al pie y eliminar los textos de sidebar-note. Reforzó que el 07 debe permanecer abierto hasta quedar conforme con la UI. Los nuevos ajustes son una ampliación de esta entrega visual, sin depender parcialmente de otros tickets.
 
 El usuario agregó porcentajes de completitud para features y tickets en progreso, una ruta de repositorio identificable como directorio y un encabezado de feature sin contador. Estos ajustes pertenecen al 07 y no cierran el ticket hasta recibir conformidad explícita.
+
+El usuario pidió ordenar las sesiones Codex recientes, identificar el proyecto/carpeta de cada una y facilitar que el selector muestre las sesiones de usuario en lugar de revisiones guardian repetidas. Se añadió esta ampliación al 07; sigue abierto hasta la conformidad visual explícita.
