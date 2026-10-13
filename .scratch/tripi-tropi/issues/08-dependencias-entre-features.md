@@ -1,9 +1,9 @@
 # 08: Vincular dependencias entre tickets de distintas features
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: dependencies, viewer
 Blocked by: 03; 04; 05
-Commits: none
+Commits: aa1c4df
 
 ## Estado inicial
 
@@ -26,7 +26,7 @@ Después de completar todas las dependencias, este ticket entrega el flujo compl
 - [x] Verificar dos features con el mismo número, dependencias mixtas, ciclos entre features, cambios en vivo y navegación con filtros; incluir revalidación de cola y ausencia de escrituras del visor.
 
 ## Trabajo realizado
-Pendiente. Se definió el alcance; no se implementaron relaciones entre features.
+Cross-feature dependencies now resolve exact feature-qualified references across parsing, readiness, navigation, live refresh and queue; `npm test` passed (33 tests) and strict validation reported 16 tickets, 0 errors and 0 warnings.
 
 ## Estado posterior
-Pendiente de implementación y verificación. El formato actual solo resuelve dependencias numéricas dentro de la misma feature; no usar referencias calificadas hasta completar este ticket. Registrar resultados y hashes reales antes del cierre.
+Completado. Los tickets locales y entre features comparten el mismo grafo de dependencias y el viewer conserva su comportamiento de solo lectura.
