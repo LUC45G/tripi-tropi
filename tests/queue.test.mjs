@@ -124,7 +124,7 @@ test('queue revalidates disk state, blocks duplicates across concurrent requests
     assert.match(messages[0].message, /ALL dependencies/); assert.match(messages[0].message, /atomic/);
     assert.match(messages[0].message, /Revalidated dependency list:\n- None/);
     assert.match(messages[0].message, /at least one implementation commit/); assert.match(messages[0].message, /Commits/);
-    assert.doesNotMatch(messages[0].message, /Queued for the next turn: do not interrupt current work/);
+    assert.doesNotMatch(messages[0].message, /Queued/);
     assert.equal(await readFile(first, 'utf8'), original);
     const restarted = await createQueue({ ...f, thread: 'test-session', deliver });
     assert.equal((await restarted.enqueue(f.tickets[0].id)).code, 409);
@@ -152,6 +152,26 @@ test('HTTP queue requires exact origin and token and only accepts ticket identif
     assert.equal((await send({ ticket: f.tickets[0].id })).status, 409);
     assert.equal(messages.length, 1);
     assert.match(await readFile(path.join(f.issues, '01-queue.md'), 'utf8'), /Execution: pending/);
+  } finally { await stop(viewer); await rm(f.base, { recursive: true, force: true }); }
+});
+
+test('implementation-message endpoint copies only a currently ready ticket without queueing or writing', async () => {
+  const f = await fixture(); const before = await readFile(path.join(f.issues, '01-queue.md'), 'utf8'); const sent = [];
+  const viewer = await createViewer({ repo: f.repo, queueOptions: { stateDirectory: f.stateDirectory, deliver: async (message) => sent.push(message) } });
+  try {
+    const info = await (await fetch(`${viewer.url}/api/queue`)).json();
+    const headers = { Origin: viewer.url, 'Content-Type': 'application/json', 'X-Queue-Token': info.token };
+    const copy = (ticket, token = info.token) => fetch(`${viewer.url}/api/implementation-message`, { method: 'POST', headers: { ...headers, 'X-Queue-Token': token }, body: JSON.stringify({ ticket }) });
+    assert.equal((await copy(f.tickets[0].id, 'wrong')).status, 403);
+    const response = await copy(f.tickets[0].id); const result = await response.json();
+    assert.equal(response.status, 200);
+    assert.match(result.message, /\.scratch.*01-queue\.md/);
+    assert.match(result.message, /ALL dependencies/);
+    assert.deepEqual((await (await fetch(`${viewer.url}/api/queue`)).json()).records, {});
+    assert.deepEqual(sent, []);
+    assert.equal(await readFile(path.join(f.issues, '01-queue.md'), 'utf8'), before);
+    await writeFile(path.join(f.issues, '01-queue.md'), before.replace('Status: ready-for-agent', 'Status: ready-for-human'));
+    assert.equal((await copy(f.tickets[0].id)).status, 409);
   } finally { await stop(viewer); await rm(f.base, { recursive: true, force: true }); }
 });
 

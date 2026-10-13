@@ -337,6 +337,9 @@ test('browser selects and unlinks Codex sessions, closes the menu accessibly and
   let emptyViewer;
   try {
     const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (text) => { window.__copiedMessage = text; } } });
+    });
     await page.goto(viewer.url);
     const session = page.locator('#queue-session');
     await page.waitForFunction(() => !document.querySelector('#queue-session').disabled);
@@ -365,6 +368,10 @@ test('browser selects and unlinks Codex sessions, closes the menu accessibly and
     await page.locator('[data-feature="feature-original"]').click();
     await page.locator('#ticket-list [data-ticket="feature-original/02-ready.md"]').click();
     assert.equal(await page.getByRole('button', { name: 'Queue implementation', exact: true }).isDisabled(), true);
+    await page.getByRole('button', { name: 'Copy implementation message' }).click();
+    await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    assert.match(await page.evaluate(() => window.__copiedMessage), /\.scratch.*02-ready\.md/);
+    assert.match(await page.locator('#detail [data-queue-status]').textContent(), /Paste it manually/);
     await page.route('**/control/stop', (route) => route.abort());
     await page.getByRole('button', { name: 'Exit', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: 'Could not exit the viewer' }).waitFor();

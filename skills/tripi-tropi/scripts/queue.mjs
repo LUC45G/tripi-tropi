@@ -39,7 +39,7 @@ Re-read the full ticket and ALL dependencies from disk; validate before starting
 ${dependencies}
 Proceed only if pending, ready-for-agent, every dependency is completed and the ticket is atomic. Stop if claimed/completed, no longer ready or requiring interleaving.
 Implement and verify only this ticket. Follow the guide for incremental execution/work/final records, at least one implementation commit identifying feature and number, and real hashes in Commits via a subsequent ticket-record commit. Never invent hashes or push without an explicit request.
-Queued does not mean started or completed.`;
+`;
 }
 
 export async function createQueue({ repo, thread = '', deliver = queueMessage, stateDirectory = path.join(tmpdir(), 'tripi-tropi'), resolveThreadName = readThreadName, resolveSessions = listCodexSessions }) {
@@ -66,6 +66,14 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
   }
   let records = await readRecords(thread);
   let writes = Promise.resolve();
+  async function prepareMessage(id) {
+    if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
+    const data = await loadTickets(repo);
+    const ticket = deriveTicketStates(data.tickets).find((item) => item.id === id);
+    if (!ticket) return { code: 404, error: 'Ticket no longer exists.' };
+    if (ticket.displayState !== 'Ready to implement' || ticket.triageRole !== 'ready-for-agent') return { code: 409, error: 'Ticket is no longer ready for the agent. Refresh its current state.' };
+    return { code: 200, message: implementationMessage(repo, ticket) };
+  }
   function persist() {
     const value = JSON.stringify(records);
     const next = writes.then(async () => {
@@ -94,22 +102,21 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
       nameReadAt = Date.now();
       threadName = await resolveThreadName(thread).catch(() => null);
     },
+    async copyMessage(id) { return prepareMessage(id); },
     async enqueue(id) {
       if (!thread) return { code: 409, error: 'No Codex session linked. Launch with --thread or CODEX_THREAD_ID.' };
       if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
       if (changingThread) return { code: 409, error: 'The queue destination is changing. Retry after it has finished.' };
       activeSends++;
       try {
-        const data = await loadTickets(repo);
-        const ticket = deriveTicketStates(data.tickets).find((item) => item.id === id);
-        if (!ticket) return { code: 404, error: 'Ticket no longer exists.' };
-        if (ticket.displayState !== 'Ready to implement' || ticket.triageRole !== 'ready-for-agent') return { code: 409, error: 'Ticket is no longer ready for the agent. Refresh its current state.' };
+        const prepared = await prepareMessage(id);
+        if (prepared.code !== 200) return prepared;
         if (Object.hasOwn(records, id)) return { code: 409, error: 'A send was already attempted. Check the linked session; automatic retries are disabled.', record: records[id] };
         records[id] = { status: 'Sending', at: new Date().toISOString() };
         try {
           // Persist before delivery, so refresh/restart cannot accidentally send twice.
           await persist();
-          await deliver({ repo, thread, message: implementationMessage(repo, ticket) });
+          await deliver({ repo, thread, message: prepared.message });
           records[id] = { ...records[id], status: 'Queued' }; await persist();
           return { code: 200, record: records[id] };
         } catch (error) {

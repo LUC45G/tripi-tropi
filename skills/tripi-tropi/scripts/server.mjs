@@ -53,6 +53,19 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
         const result = await queue.enqueue(payload.ticket); return json(result.code, result);
       } catch (error) { return json(400, { error: `Could not queue ticket: ${error.message}` }); }
     }
+    if (pathname === '/api/implementation-message' && request.method === 'POST') {
+      const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
+      const expected = Buffer.from(queue.info().token);
+      if (request.headers.origin !== `http://${expectedHost}` || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return json(403, { error: 'A same-origin queue session token is required.' });
+      if (!request.headers['content-type']?.startsWith('application/json')) return json(415, { error: 'Expected JSON ticket identifier.' });
+      try {
+        let body = '';
+        for await (const chunk of request) { body += chunk; if (body.length > 4096) return json(413, { error: 'Copy request is too large.' }); }
+        const payload = JSON.parse(body);
+        if (!payload || Object.keys(payload).length !== 1 || typeof payload.ticket !== 'string') return json(400, { error: 'Only a ticket identifier is accepted.' });
+        const result = await queue.copyMessage(payload.ticket); return json(result.code, result);
+      } catch (error) { return json(400, { error: `Could not prepare implementation message: ${error.message}` }); }
+    }
     if (pathname === '/api/session' && request.method === 'POST') {
       const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
       const expected = Buffer.from(queue.info().token);

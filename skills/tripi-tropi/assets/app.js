@@ -217,8 +217,9 @@ function queueControls(ticket) {
   if (!ready && !record) return '';
   const disabled = !queueInfo.thread || !queueInfo.token || Boolean(record);
   const button = ready ? `<button type="button" class="refresh" data-queue="${escapeHTML(ticket.id)}" ${disabled ? 'disabled' : ''}>${escapeHTML(record?.status ?? 'Queue implementation')}</button>` : '';
+  const copyButton = ready ? `<button type="button" class="refresh" data-copy-message="${escapeHTML(ticket.id)}" ${!queueInfo.token ? 'disabled' : ''}>Copy implementation message</button>` : '';
   const message = record?.error ?? (record ? 'Delivery status only; ticket execution is shown separately. Check the linked session before any new send.' : queueInfo.thread ? 'Send this ticket to the linked Codex session after its current turn.' : 'No Codex session linked. Launch with --thread to enable sending.');
-  return `<section class="queue-controls">${button}<p role="status" class="${record?.error ? 'error-text' : 'muted'}">${escapeHTML(message)}</p></section>`;
+  return `<section class="queue-controls">${button}${copyButton}<p data-queue-status role="status" class="${record?.error ? 'error-text' : 'muted'}">${escapeHTML(message)}${ready ? ' Copy the message to paste into Claude, OpenCode, or another agent manually.' : ''}</p></section>`;
 }
 
 function ticketBody(content) {
@@ -463,6 +464,26 @@ el('detail').addEventListener('click', (event) => {
   event.preventDefault(); navigateTicket(link.dataset.ticket);
 });
 el('detail').addEventListener('click', async (event) => {
+  const copyButton = event.target.closest('[data-copy-message]');
+  if (copyButton) {
+    copyButton.disabled = true;
+    const status = el('detail').querySelector('[data-queue-status]');
+    try {
+      const response = await fetch('/api/implementation-message', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Queue-Token': queueInfo.token }, body: JSON.stringify({ ticket: copyButton.dataset.copyMessage }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? 'Could not prepare implementation message.');
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser context.');
+      await navigator.clipboard.writeText(result.message);
+      status.textContent = 'Implementation message copied. Paste it manually into the agent session.';
+      status.classList.remove('error-text');
+      copyButton.textContent = 'Copied';
+    } catch (error) {
+      status.textContent = error.message;
+      status.classList.add('error-text');
+      copyButton.disabled = false;
+    }
+    return;
+  }
   const button = event.target.closest('[data-queue]');
   if (!button || button.disabled) return;
   const ticket = button.dataset.queue;
