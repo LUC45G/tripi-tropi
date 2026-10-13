@@ -3,7 +3,7 @@ Status: ready-for-agent
 Execution: in-progress
 Labels: viewer, design
 Blocked by: 04
-Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a, 7b26ad6251d8, 24a61004967d
+Commits: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733, 20f4f8c58f68, 090145a, 7b26ad6251d8, 24a61004967d, e84e41f77898
 
 ## Estado inicial
 
@@ -35,6 +35,7 @@ Entrega completa de presentación y navegación de la sidebar, después del 04, 
 - [x] Al clickear una dependencia dentro de un ticket, desplazar la lista de la mitad izquierda hasta ese ticket cuando pertenece a la misma feature.
 - [x] En el selector Codex, mostrar por defecto las sesiones de usuario (`thread_source: user`), ordenadas por actividad reciente; permitir mostrar el resto y mantener accesible el destino actualmente vinculado.
 - [x] Mostrar el proyecto/carpeta y fecha de actividad en cada opción, leyendo `cwd` y `thread_source` de los metadatos locales de sesión sin modificar archivos de Codex.
+- [x] Encolar a Codex con `CODEX_HOME` configurado o con el directorio `~/.codex` como fallback cuando esa variable no exista en el entorno del viewer.
 
 ## Trabajo realizado
 Marca SVG compartida con favicon, textos eliminados y cursores de resize según orientación. Botón accesible con aria-expanded para colapsar/expandir la sidebar, preferencia por repositorio y ancho conservado. Live tiene descripción de su conexión para actualizaciones automáticas. Pruebas de navegador verifican identidad, ausencia de textos, cursores, colapso, recarga y restauración de ancho; las pruebas en vivo siguen pasando.
@@ -57,6 +58,8 @@ Corrección posterior: el desplazamiento de una dependencia ahora centra la fila
 
 Selector Codex: las sesiones se ordenan por actividad reciente; se muestra carpeta, fecha e ID. Por defecto aparecen las sesiones `user`, con acceso opcional al índice completo. Se leen metadatos locales sin escribirlos. `npm test`: 37/37; validación estricta: 13 tickets sin errores ni warnings.
 
+Codex queue en Windows: cuando `CODEX_HOME` falta, el subproceso recibe `~/.codex` como fallback. `codex queue --help` reproduce el error de home sin la variable y lo elimina con el fallback; `npm test`: 37/37.
+
 ## Estado posterior
 Entregas verificadas: 21d5ec8d3520, 4c1d7bef077c, 6458e758c733 y 20f4f8c58f68. Sigue in-progress por revisión visual del usuario. No completar este ticket hasta su conformidad explícita con la UI; registrar los próximos commits reales sin cerrar el ticket.
 
@@ -69,3 +72,5 @@ El usuario agregó consistencia y títulos para dropdowns, cierre al hacer clic 
 El usuario agregó porcentajes de completitud para features y tickets en progreso, una ruta de repositorio identificable como directorio y un encabezado de feature sin contador. Estos ajustes pertenecen al 07 y no cierran el ticket hasta recibir conformidad explícita.
 
 El usuario pidió ordenar las sesiones Codex recientes, identificar el proyecto/carpeta de cada una y facilitar que el selector muestre las sesiones de usuario en lugar de revisiones guardian repetidas. Se añadió esta ampliación al 07; sigue abierto hasta la conformidad visual explícita.
+
+El usuario reportó que `Queue implementation` fallaba al no encontrar Codex home. Se verificó que el viewer hereda `CODEX_HOME` vacío y se corrigió el entorno del proceso hijo con el fallback local de Codex; el ticket continúa abierto.
