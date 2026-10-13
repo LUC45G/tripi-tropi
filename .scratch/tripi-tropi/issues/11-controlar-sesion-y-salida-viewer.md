@@ -1,9 +1,9 @@
 # 11: Controlar la sesión Codex y cerrar el viewer
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: codex, viewer, controls
 Blocked by: 05, 06
-Commits: none
+Commits: 703b111
 
 ## Estado inicial
 
@@ -32,4 +32,4 @@ Session control: el header lee el índice local de Codex, permite seleccionar o 
 
 ## Estado posterior
 
-Pendiente de registrar el hash del commit de implementación en un commit posterior. Los controles mantienen los tickets y la configuración de Codex intactos.
+Completado. El hash real de implementación está registrado arriba; el viewer se cierra de forma independiente y la pestaña queda abierta.
