@@ -41,7 +41,26 @@ test('optional session display name reads the latest matching index record and t
     assert.equal(await readThreadName('linked-id', home), 'Current title');
     assert.equal(await readThreadName('unknown-id', home), null);
     assert.deepEqual(await listCodexSessions(home), [
-      { id: 'other-id', name: 'Another session' }, { id: 'linked-id', name: 'Current title' },
+      { id: 'linked-id', name: 'Current title', updatedAt: null, cwd: null, threadSource: 'unknown', parentThreadId: null },
+      { id: 'other-id', name: 'Another session', updatedAt: null, cwd: null, threadSource: 'unknown', parentThreadId: null },
+    ]);
+  } finally { await rm(home, { recursive: true, force: true }); }
+});
+
+test('session picker metadata sorts by recent activity and reads project and source from local rollout metadata', async () => {
+  const home = await mkdtemp(path.join(tmpdir(), 'tripi-session-metadata-'));
+  const folder = path.join(home, 'sessions', '2026', '10', '13');
+  await mkdir(folder, { recursive: true });
+  await writeFile(path.join(home, 'session_index.jsonl'), [
+    JSON.stringify({ id: 'older-user', thread_name: 'Earlier', updated_at: '2026-10-10T10:00:00Z' }),
+    JSON.stringify({ id: 'newer-review', thread_name: 'Guardian review', updated_at: '2026-10-13T10:00:00Z' }),
+  ].join('\n'));
+  await writeFile(path.join(folder, 'rollout-2026-10-10-older-user.jsonl'), `${JSON.stringify({ type: 'session_meta', payload: { id: 'older-user', cwd: 'C:\\work\\tripi-tropi', thread_source: 'user' } })}\n`);
+  await writeFile(path.join(folder, 'rollout-2026-10-13-newer-review.jsonl'), `${JSON.stringify({ type: 'session_meta', payload: { id: 'newer-review', cwd: 'C:\\work\\classroom-tracking', thread_source: 'guardian_review', parent_thread_id: 'parent-session' } })}\n`);
+  try {
+    assert.deepEqual(await listCodexSessions(home), [
+      { id: 'newer-review', name: 'Guardian review', updatedAt: '2026-10-13T10:00:00Z', cwd: 'C:\\work\\classroom-tracking', threadSource: 'guardian_review', parentThreadId: 'parent-session' },
+      { id: 'older-user', name: 'Earlier', updatedAt: '2026-10-10T10:00:00Z', cwd: 'C:\\work\\tripi-tropi', threadSource: 'user', parentThreadId: null },
     ]);
   } finally { await rm(home, { recursive: true, force: true }); }
 });

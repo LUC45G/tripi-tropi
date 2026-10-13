@@ -16,6 +16,7 @@ let storageTimer;
 let eventSource;
 let queueInfo = { thread: null, token: '', records: {} };
 let queueReadGeneration = 0;
+let showAllSessions = false;
 const workspace = document.querySelector('.workspace');
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 async function loadSkillVersion() {
@@ -293,12 +294,23 @@ async function openSessionMenu() {
     const response = await fetch('/api/sessions');
     const result = await response.json();
     if (!response.ok) throw new Error(result.error ?? 'Could not read Codex sessions.');
-    const options = result.sessions.map((session) => `<button type="button" role="menuitemradio" data-session="${escapeHTML(session.id)}" aria-checked="${session.id === queueInfo.thread}"><span class="session-option-name">${escapeHTML(session.name || 'Unnamed session')}</span><span class="session-option-id">${escapeHTML(session.id)}</span></button>`);
-    if (!options.length) options.push('<p class="muted session-empty">No sessions are available in the local Codex index.</p>');
+    const userSessions = result.sessions.filter((session) => session.threadSource === 'user' || session.id === queueInfo.thread);
+    const sessions = showAllSessions ? result.sessions : userSessions;
+    const otherCount = result.sessions.length - userSessions.length;
+    const toggle = otherCount ? `<button type="button" role="menuitemcheckbox" data-session-filter aria-checked="${showAllSessions}">${showAllSessions ? 'Show user sessions only' : `Show all indexed sessions (${otherCount})`}</button>` : '';
+    const options = sessions.map((session) => {
+      const date = session.updatedAt && Number.isFinite(Date.parse(session.updatedAt)) ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(session.updatedAt)) : '';
+      const folder = session.cwd ? session.cwd.split(/[\\/]/).filter(Boolean).at(-1) : 'Project unknown';
+      const origin = session.threadSource && session.threadSource !== 'user' ? ` · ${session.threadSource}` : '';
+      const detail = [folder, date].filter(Boolean).join(' · ');
+      return `<button type="button" role="menuitemradio" data-session="${escapeHTML(session.id)}" aria-checked="${session.id === queueInfo.thread}" title="${escapeHTML(session.cwd || 'Project folder unavailable')}"><span class="session-option-name">${escapeHTML(session.name || 'Unnamed session')}${escapeHTML(origin)}</span><span class="session-option-meta">${escapeHTML(detail)}</span><span class="session-option-id">${escapeHTML(session.id)}</span></button>`;
+    });
+    if (!sessions.length) options.push(`<p class="muted session-empty">${result.sessions.length ? 'No user sessions found.' : 'No sessions are available in the local Codex index.'}</p>`);
+    if (toggle) options.unshift(toggle);
     options.push(`<button type="button" role="menuitem" class="session-unlink" data-session="">Unlink session</button>`);
     menu.innerHTML = options.join('');
   } catch (error) { menu.innerHTML = `<p class="error-text">${escapeHTML(error.message)}</p><button type="button" role="menuitem" class="session-unlink" data-session="">Unlink session</button>`; }
-  menu.querySelector('[data-session]')?.focus({ preventScroll: true });
+  menu.querySelector('[data-session], [data-session-filter]')?.focus({ preventScroll: true });
 }
 
 async function selectQueueSession(session) {
@@ -320,8 +332,11 @@ el('queue-session').addEventListener('click', () => {
   if (el('session-menu').hidden) openSessionMenu(); else closeSessionMenu();
 });
 el('session-menu').addEventListener('click', (event) => {
+  event.stopPropagation();
   const option = event.target.closest('[data-session]');
   if (option) selectQueueSession(option.dataset.session);
+  const filter = event.target.closest('[data-session-filter]');
+  if (filter) { showAllSessions = !showAllSessions; openSessionMenu(); }
 });
 el('session-backdrop').addEventListener('click', () => closeSessionMenu());
 document.addEventListener('click', (event) => {

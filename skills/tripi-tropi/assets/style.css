@@ -37,6 +37,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .session-menu button { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 9px 10px; border: 0; border-radius: 4px; background: transparent; text-align: left; }
 .session-menu button:hover, .session-menu button[aria-checked="true"] { background: var(--control-hover); }
 .session-option-name { font-size: 12px; overflow-wrap: anywhere; }
+.session-option-meta { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
 .session-option-id { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
 .session-menu .session-unlink { margin-top: 6px; border-top: 1px solid var(--line); border-radius: 0; color: var(--muted); }
 .session-id { color: var(--muted); }

@@ -107,7 +107,7 @@ test('session API accepts only indexed destinations and authenticated Exit stops
   const repo = await fixture(); const before = await digest(repo);
   const otherRepo = await mkdtemp(path.join(tmpdir(), 'tripi-tropi-other-viewer-'));
   const registryFile = path.join(tmpdir(), `tripi-tropi-viewer-${process.pid}-${Date.now()}.json`);
-  const sessions = [{ id: 'session-one', name: 'First' }, { id: 'session-two', name: 'Second' }];
+  const sessions = [{ id: 'session-one', name: 'First', threadSource: 'user', cwd: 'C:\\work\\first', updatedAt: '2026-10-13T10:00:00Z' }, { id: 'session-two', name: 'Second', threadSource: 'user', cwd: 'C:\\work\\second', updatedAt: '2026-10-13T09:00:00Z' }];
   const viewer = await createViewer({ repo, thread: 'session-one', controlToken: 'viewer-control-token', registryFile, queueOptions: { resolveSessions: async () => sessions, resolveThreadName: async (id) => sessions.find((item) => item.id === id)?.name ?? null } });
   const other = await createViewer({ repo: otherRepo, controlToken: 'other-viewer-token' });
   try {
@@ -327,7 +327,11 @@ test('browser selects and unlinks Codex sessions, closes the menu accessibly and
   const repo = await fixture();
   await writeFile(path.join(repo, '.scratch/feature-original/issues/02-ready.md'), '# 02: Ready ticket\nStatus: ready-for-agent\nExecution: pending\nLabels: demo\nBlocked by: none\nCommits: none\n\n## Initial state\n### What to build\nOne outcome.\n### Atomicity\nComplete result.\n### Acceptance criteria\n- [ ] Verify.\n## Work performed\nPending.\n## Final state\nPending.\n');
   const before = await digest(repo);
-  const sessions = [{ id: 'session-one', name: 'First session' }, { id: 'session-two', name: 'Second session' }];
+  const sessions = [
+    { id: 'session-one', name: 'First session', threadSource: 'user', cwd: 'C:\\work\\first-project', updatedAt: '2026-10-13T10:00:00Z' },
+    { id: 'session-two', name: 'Second session', threadSource: 'user', cwd: 'C:\\work\\second-project', updatedAt: '2026-10-13T09:00:00Z' },
+    { id: 'review-session', name: 'Guardian review', threadSource: 'guardian_review', cwd: 'C:\\work\\reviewed-project', updatedAt: '2026-10-13T08:00:00Z' },
+  ];
   const viewer = await createViewer({ repo, thread: 'session-one', controlToken: 'viewer-control-token', queueOptions: { resolveSessions: async () => sessions, resolveThreadName: async (id) => sessions.find((item) => item.id === id)?.name ?? null } });
   const browser = await chromium.launch({ executablePath: browserPath, headless: true });
   let emptyViewer;
@@ -338,6 +342,12 @@ test('browser selects and unlinks Codex sessions, closes the menu accessibly and
     await page.waitForFunction(() => !document.querySelector('#queue-session').disabled);
     await session.click();
     await page.getByRole('menuitemradio', { name: /Second session.*session-two/ }).waitFor();
+    assert.match(await page.locator('#session-menu').textContent(), /second-project/);
+    assert.equal(await page.getByRole('menuitemradio', { name: /Guardian review/ }).count(), 0);
+    await page.getByRole('menuitemcheckbox', { name: 'Show all indexed sessions (1)' }).click();
+    await page.locator('#session-menu [data-session="review-session"]').waitFor();
+    await page.getByRole('menuitemcheckbox', { name: 'Show user sessions only' }).click();
+    assert.equal(await page.getByRole('menuitemradio', { name: /Guardian review/ }).count(), 0);
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#session-menu').isHidden(), true);
     assert.equal(await session.evaluate((node) => node === document.activeElement), true);
