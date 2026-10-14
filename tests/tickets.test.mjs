@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { parseTicket, validateGraph, loadTickets, within } from '../skills/tripi-tropi/scripts/tickets.mjs';
+import { parseTicket, validateGraph, loadTickets, within, validateFeature } from '../skills/tripi-tropi/scripts/tickets.mjs';
 
 function canonical(number = 1, overrides = {}) {
   const fields = { Status: 'ready-for-agent', Execution: 'pending', Labels: 'backend, migration', 'Blocked by': 'none', Commits: 'none', ...overrides };
@@ -111,7 +111,7 @@ test('loader and CLI read complete features without altering observed files', as
     assert.equal(JSON.parse(cli.stdout).errors, 0);
     assert.equal(await readFile(filename, 'utf8'), body);
     assert.deepEqual(await readdir(issues), before);
-    await assert.rejects(loadTickets(repo, { feature: '../demo' }), /directory name/);
+    assert.throws(() => validateFeature('../demo'), /directory name/);
   } finally { await rm(repo, { recursive: true, force: true }); }
 });
 

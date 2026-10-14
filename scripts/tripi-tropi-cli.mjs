@@ -11,7 +11,7 @@ try {
   const skillsIndex = args.indexOf('--skills-dir');
   const skillsDir = skillsIndex >= 0 ? args[skillsIndex + 1] : undefined;
   if (skillsIndex >= 0 && (!skillsDir || skillsDir.startsWith('-'))) throw new Error('--skills-dir requires a directory.');
-  const unknown = args.filter((arg, index) => arg !== '--update' && arg !== '--skills-dir' && !(index === skillsIndex + 1));
+  const unknown = args.filter((arg, index) => arg !== '--update' && arg !== '--skills-dir' && !(skillsIndex >= 0 && index === skillsIndex + 1));
   if (unknown.length) throw new Error(`Unknown option: ${unknown.join(', ')}`);
   const target = await installSkill({ skillsDir, update: args.includes('--update') });
   console.log(`Installed tripi-tropi at ${target}\nInvoke $tripi-tropi in Codex. If absent, restart Codex.`);

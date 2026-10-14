@@ -155,6 +155,7 @@ function markdown(content) {
   const html = DOMPurify.sanitize(marked.parse(content ?? '', { gfm: true, breaks: false }), {
     FORBID_TAGS: ['form', 'button', 'iframe', 'style', 'script', 'video', 'audio'],
     FORBID_ATTR: ['style', 'autofocus'],
+    ALLOW_DATA_ATTR: false,
   });
   const template = document.createElement('template');
   template.innerHTML = html;
@@ -464,7 +465,7 @@ el('detail').addEventListener('click', (event) => {
   event.preventDefault(); navigateTicket(link.dataset.ticket);
 });
 el('detail').addEventListener('click', async (event) => {
-  const copyButton = event.target.closest('[data-copy-message]');
+  const copyButton = event.target.closest('.queue-controls > button[data-copy-message]');
   if (copyButton) {
     copyButton.disabled = true;
     const status = el('detail').querySelector('[data-queue-status]');
@@ -484,7 +485,7 @@ el('detail').addEventListener('click', async (event) => {
     }
     return;
   }
-  const button = event.target.closest('[data-queue]');
+  const button = event.target.closest('.queue-controls > button[data-queue]');
   if (!button || button.disabled) return;
   const ticket = button.dataset.queue;
   queueInfo.records[ticket] = { status: 'Sending' }; render();

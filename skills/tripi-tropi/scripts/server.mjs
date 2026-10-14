@@ -37,51 +37,31 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
     let pathname;
     try { pathname = new URL(request.url, `http://${expectedHost}`).pathname; }
     catch { return json(400, { error: 'Invalid URL.' }); }
-    if (pathname === '/api/queue' && request.method === 'POST') {
+    if (request.method === 'POST' && ['/api/queue', '/api/implementation-message', '/api/session'].includes(pathname)) {
       const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
       const expected = Buffer.from(queue.info().token);
       if (request.headers.origin !== `http://${expectedHost}` || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return json(403, { error: 'A same-origin queue session token is required.' });
-      if (!request.headers['content-type']?.startsWith('application/json')) return json(415, { error: 'Expected JSON ticket identifier.' });
+      if (!request.headers['content-type']?.startsWith('application/json')) return json(415, { error: 'Expected a JSON request.' });
       try {
+        request.setEncoding('utf8');
         let body = '';
         for await (const chunk of request) {
           body += chunk;
-          if (body.length > 4096) return json(413, { error: 'Queue request is too large.' });
+          if (Buffer.byteLength(body, 'utf8') > 4096) return json(413, { error: 'Request is too large.' });
         }
         const payload = JSON.parse(body);
+        if (pathname === '/api/session') {
+          if (!payload || Object.keys(payload).length !== 1 || !Object.hasOwn(payload, 'session') || (payload.session !== null && typeof payload.session !== 'string')) return json(400, { error: 'Only a session identifier or null may be selected.' });
+          if (payload.session !== null && !(await queue.listSessions()).some((session) => session.id === payload.session)) return json(409, { error: 'That session is no longer available in the local index. Refresh sessions.' });
+          const result = await queue.setThread(payload.session);
+          if (result.code !== 200) return json(result.code, { error: result.error });
+          await queue.refreshThreadName();
+          return json(200, queue.info());
+        }
         if (!payload || Object.keys(payload).length !== 1 || typeof payload.ticket !== 'string') return json(400, { error: 'Only a ticket identifier is accepted.' });
-        const result = await queue.enqueue(payload.ticket); return json(result.code, result);
-      } catch (error) { return json(400, { error: `Could not queue ticket: ${error.message}` }); }
-    }
-    if (pathname === '/api/implementation-message' && request.method === 'POST') {
-      const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
-      const expected = Buffer.from(queue.info().token);
-      if (request.headers.origin !== `http://${expectedHost}` || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return json(403, { error: 'A same-origin queue session token is required.' });
-      if (!request.headers['content-type']?.startsWith('application/json')) return json(415, { error: 'Expected JSON ticket identifier.' });
-      try {
-        let body = '';
-        for await (const chunk of request) { body += chunk; if (body.length > 4096) return json(413, { error: 'Copy request is too large.' }); }
-        const payload = JSON.parse(body);
-        if (!payload || Object.keys(payload).length !== 1 || typeof payload.ticket !== 'string') return json(400, { error: 'Only a ticket identifier is accepted.' });
-        const result = await queue.copyMessage(payload.ticket); return json(result.code, result);
-      } catch (error) { return json(400, { error: `Could not prepare implementation message: ${error.message}` }); }
-    }
-    if (pathname === '/api/session' && request.method === 'POST') {
-      const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
-      const expected = Buffer.from(queue.info().token);
-      if (request.headers.origin !== `http://${expectedHost}` || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return json(403, { error: 'A same-origin session token is required.' });
-      if (!request.headers['content-type']?.startsWith('application/json')) return json(415, { error: 'Expected a session identifier.' });
-      try {
-        let body = '';
-        for await (const chunk of request) { body += chunk; if (body.length > 4096) return json(413, { error: 'Session request is too large.' }); }
-        const payload = JSON.parse(body);
-        if (!payload || Object.keys(payload).length !== 1 || !Object.hasOwn(payload, 'session') || (payload.session !== null && typeof payload.session !== 'string')) return json(400, { error: 'Only a session identifier or null may be selected.' });
-        if (payload.session !== null && !(await queue.listSessions()).some((session) => session.id === payload.session)) return json(409, { error: 'That session is no longer available in the local index. Refresh sessions.' });
-        const result = await queue.setThread(payload.session);
-        if (result.code !== 200) return json(result.code, { error: result.error });
-        await queue.refreshThreadName();
-        return json(200, queue.info());
-      } catch (error) { return json(400, { error: `Could not change queue destination: ${error.message}` }); }
+        const result = pathname === '/api/queue' ? await queue.enqueue(payload.ticket) : await queue.copyMessage(payload.ticket);
+        return json(result.code, result);
+      } catch (error) { return json(400, { error: `Could not process request: ${error.message}` }); }
     }
     if (pathname === '/control/stop' && request.method === 'POST') {
       const supplied = Buffer.from(String(request.headers['x-viewer-token'] ?? ''));

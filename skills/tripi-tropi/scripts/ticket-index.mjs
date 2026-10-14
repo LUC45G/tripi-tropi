@@ -1,17 +1,18 @@
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { encode } from '@toon-format/toon';
-import { loadTickets } from './tickets.mjs';
+import { loadTickets, validateFeature } from './tickets.mjs';
 import { deriveTicketStates, DISPLAY_STATES } from './ticket-states.mjs';
 
 /** Read-only discovery projection, not a cached snapshot or execution approval. */
 export async function ticketIndex(repo, { feature, label, state } = {}) {
   if (state && !DISPLAY_STATES.includes(state)) throw new Error(`Unknown state: ${state}. Use: ${DISPLAY_STATES.join(', ')}.`);
-  const loaded = await loadTickets(repo, { feature, strict: true });
+  validateFeature(feature);
+  const loaded = await loadTickets(repo, { strict: true });
   const diagnostics = [...loaded.diagnostics, ...loaded.tickets.flatMap((ticket) =>
     ticket.diagnostics.map((item) => ({ ticket: ticket.id, ...item })))];
   const rows = deriveTicketStates(loaded.tickets)
-    .filter((ticket) => (!label || ticket.labels.includes(label)) && (!state || ticket.displayState === state))
+    .filter((ticket) => (!feature || ticket.feature === feature) && (!label || ticket.labels.includes(label)) && (!state || ticket.displayState === state))
     .map((ticket) => ({
       id: ticket.id, title: ticket.title, status: ticket.status, execution: ticket.execution,
       state: ticket.displayState, labels: JSON.stringify(ticket.labels),

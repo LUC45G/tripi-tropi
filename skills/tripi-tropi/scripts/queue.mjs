@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { loadTickets } from './tickets.mjs';
 import { deriveTicketStates } from './ticket-states.mjs';
-import { readThreadName, listCodexSessions } from './thread-name.mjs';
+import { readThreadName, listCodexSessions, resolveCodexThread } from './thread-name.mjs';
 
 export function queueMessage({ thread, message, repo, spawnProcess = spawn, timeout = 30000 }) {
   return new Promise((resolve, reject) => {
@@ -44,7 +44,7 @@ Implement and verify only this ticket. Follow the guide for incremental executio
 
 export async function createQueue({ repo, thread = '', deliver = queueMessage, stateDirectory = path.join(tmpdir(), 'tripi-tropi'), resolveThreadName = readThreadName, resolveSessions = listCodexSessions }) {
   if (typeof thread !== 'string' || thread.length > 200 || /[\x00-\x1f]/.test(thread)) throw new Error('Invalid Codex thread.');
-  thread = thread.trim();
+  thread = await resolveCodexThread(thread, resolveSessions);
   let threadName = null;
   let nameReadAt = 0;
   let activeSends = 0;
@@ -57,10 +57,24 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
   async function readRecords(destination) {
     if (!destination) return {};
     let current = {};
-    try { current = JSON.parse(await readFile(ledgerFor(destination), 'utf8')); }
-    catch (error) { if (error.code !== 'ENOENT') throw new Error(`Queue state could not be read: ${error.message}`); }
+    let migrate = false;
+    const aliases = (await resolveSessions()).filter((session) => session.id === destination && session.name).map((session) => session.name);
+    // Preserve pre-0.1.3 attempts stored under an exact session name.
+    for (const identity of new Set([...aliases, destination])) {
+      try {
+        const saved = JSON.parse(await readFile(ledgerFor(identity), 'utf8'));
+        if (identity !== destination && Object.keys(saved).length) migrate = true;
+        current = { ...current, ...saved };
+      }
+      catch (error) { if (error.code !== 'ENOENT') throw new Error(`Queue state could not be read: ${error.message}`); }
+    }
     for (const [id, record] of Object.entries(current)) {
       if (record.status === 'Sending') current[id] = { ...record, status: 'Error', error: 'Previous delivery was interrupted. Check the linked session; no automatic retry was sent.' };
+    }
+    if (migrate) {
+      const ledger = ledgerFor(destination);
+      await writeFile(`${ledger}.tmp`, JSON.stringify(current), { mode: 0o600 });
+      await rename(`${ledger}.tmp`, ledger);
     }
     return current;
   }
@@ -68,10 +82,19 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
   let writes = Promise.resolve();
   async function prepareMessage(id) {
     if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
-    const data = await loadTickets(repo);
-    const ticket = deriveTicketStates(data.tickets).find((item) => item.id === id);
+    const data = await loadTickets(repo, { strict: true });
+    const tickets = new Map(deriveTicketStates(data.tickets).map((item) => [item.id, item]));
+    const ticket = tickets.get(id);
     if (!ticket) return { code: 404, error: 'Ticket no longer exists.' };
-    if (ticket.displayState !== 'Ready to implement' || ticket.triageRole !== 'ready-for-agent') return { code: 409, error: 'Ticket is no longer ready for the agent. Refresh its current state.' };
+    if (ticket.displayState !== 'Ready to implement' || ticket.triageRole !== 'ready-for-agent' || ticket.execution !== 'pending') return { code: 409, error: 'Ticket is no longer ready for the agent. Refresh its current state.' };
+    const dependencies = [...ticket.dependencies];
+    const checked = new Set();
+    while (dependencies.length) {
+      const dependency = tickets.get(dependencies.pop().id);
+      if (!dependency || dependency.diagnostics.some((item) => item.severity === 'error')) return { code: 409, error: 'A dependency is structurally invalid. Validate the tickets before implementation.' };
+      if (checked.has(dependency.id)) continue;
+      checked.add(dependency.id); dependencies.push(...dependency.dependencies);
+    }
     return { code: 200, message: implementationMessage(repo, ticket) };
   }
   function persist() {
@@ -89,9 +112,9 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     async setThread(destination) {
       if (destination !== null && (typeof destination !== 'string' || destination.length > 200 || /[\x00-\x1f]/.test(destination))) throw new Error('Invalid Codex session.');
       if (activeSends || changingThread) return { code: 409, error: 'A queue delivery or destination change is in progress. Wait for it to finish before changing sessions.' };
-      const next = destination?.trim() ?? '';
       changingThread = true;
       try {
+        const next = await resolveCodexThread(destination ?? '', resolveSessions);
         const nextRecords = await readRecords(next);
         thread = next; records = nextRecords; threadName = null; nameReadAt = 0;
         return { code: 200, info: this.info() };

@@ -6,6 +6,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { resolveCodexThread } from './thread-name.mjs';
 
 function openBrowser(url) {
   const command = process.platform === 'win32' ? 'rundll32.exe' : process.platform === 'darwin' ? 'open' : 'xdg-open';
@@ -34,8 +35,9 @@ async function main() {
   } });
   const repo = await realpath(path.resolve(values.repo));
   const port = Number(values.port);
-  const thread = (values.thread ?? process.env.CODEX_THREAD_ID ?? '').trim();
+  let thread = (values.thread ?? process.env.CODEX_THREAD_ID ?? '').trim();
   if (thread.length > 200 || /[\x00-\x1f]/.test(thread)) throw new Error('Invalid Codex thread.');
+  if (!values.stop) thread = await resolveCodexThread(thread);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Port must be an integer from 0 to 65535.');
   const state = path.join(tmpdir(), 'tripi-tropi');
   await mkdir(state, { recursive: true });

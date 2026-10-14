@@ -23,7 +23,8 @@ async function fixture() {
   const issues = path.join(repo, '.scratch/original/issues'); await mkdir(issues, { recursive: true });
   for (const [number, status, blocker] of [['01', 'ready-for-agent', 'none'], ['02', 'ready-for-human', 'none'], ['03', 'ready-for-agent', '01']]) await writeFile(path.join(issues, `${number}-queue.md`), ticket(number, status, blocker));
   const data = await loadTickets(repo);
-  return { base, repo, stateDirectory, issues, tickets: data.tickets };
+  const resolveSessions = async () => ['test-session', 'failure-session', 'bound-session', 'session', 'explicit-test-session'].map((id) => ({ id, name: id }));
+  return { base, repo, stateDirectory, issues, tickets: data.tickets, resolveSessions };
 }
 const stop = ({ server }) => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
 
@@ -139,7 +140,7 @@ test('queue revalidates disk state, blocks duplicates across concurrent requests
 
 test('HTTP queue requires exact origin and token and only accepts ticket identifiers', async () => {
   const f = await fixture(); const messages = [];
-  const viewer = await createViewer({ repo: f.repo, thread: 'bound-session', queueOptions: { stateDirectory: f.stateDirectory, deliver: async (value) => messages.push(value) } });
+  const viewer = await createViewer({ repo: f.repo, thread: 'bound-session', queueOptions: { stateDirectory: f.stateDirectory, resolveSessions: f.resolveSessions, deliver: async (value) => messages.push(value) } });
   try {
     const info = await (await fetch(`${viewer.url}/api/queue`)).json();
     const headers = { Origin: viewer.url, 'Content-Type': 'application/json', 'X-Queue-Token': info.token };
@@ -193,7 +194,7 @@ test('queued cross-feature ticket names every revalidated dependency in the agen
 
 test('browser displays linked destination, Sending and Queued separately from execution', { skip: !browserAvailable }, async () => {
   const f = await fixture(); let release; const waiting = new Promise((resolve) => { release = resolve; });
-  const viewer = await createViewer({ repo: f.repo, thread: 'explicit-test-session', queueOptions: { stateDirectory: f.stateDirectory, deliver: () => waiting, resolveThreadName: async () => 'Named <session>' } });
+  const viewer = await createViewer({ repo: f.repo, thread: 'explicit-test-session', queueOptions: { stateDirectory: f.stateDirectory, resolveSessions: f.resolveSessions, deliver: () => waiting, resolveThreadName: async () => 'Named <session>' } });
   const unbound = await createViewer({ repo: f.repo, queueOptions: { stateDirectory: f.stateDirectory } });
   const browser = await chromium.launch({ executablePath: browserPath, headless: true });
   try {

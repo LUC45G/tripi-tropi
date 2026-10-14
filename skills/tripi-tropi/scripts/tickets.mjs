@@ -78,6 +78,7 @@ export function parseTicket(content, { feature, filename, strict = false, triage
   if (strict && ['completed', 'resolved', 'done'].includes(terminal) && !commits.length) report('missing-implementation-commit', 'Completed tickets require an implementation commit.');
   let dependencyText = metadata['Blocked by'];
   if (dependencyText === undefined && sectionDependencies.length) dependencyText = sectionDependencies.join('; ');
+  if (dependencyText && absent(dependencyText) && /(?:[,;]\s*|\b(?:ticket|issue)\s+)(?:#\s*)?(?:[a-z\d][a-z\d._-]*:)?\d+\b/i.test(dependencyText)) report('invalid-dependency', 'An absence marker cannot be combined with ticket references.');
   const blockers = [];
   if (dependencyText && !absent(dependencyText)) {
     // Commas inside a title are prose; only split before another numeric reference.
@@ -144,8 +145,11 @@ async function safeRead(root, filename) {
   return readFile(resolved, 'utf8');
 }
 
-export async function loadTickets(repo, { strict = false, feature } = {}) {
+export function validateFeature(feature) {
   if (feature && (feature === '.' || feature === '..' || /[/\\]/.test(feature))) throw new Error('Feature must be one directory name.');
+}
+
+export async function loadTickets(repo, { strict = false } = {}) {
   const scratch = path.join(path.resolve(repo), '.scratch');
   const diagnostics = [];
   const tickets = [];
@@ -171,7 +175,7 @@ export async function loadTickets(repo, { strict = false, feature } = {}) {
     throw error;
   }
   for (const directory of await readdir(root, { withFileTypes: true })) {
-    if (!directory.isDirectory() || (feature && directory.name !== feature)) continue;
+    if (!directory.isDirectory()) continue;
     const name = directory.name;
     const entry = { name, description: null, descriptionFile: null };
     features.push(entry);

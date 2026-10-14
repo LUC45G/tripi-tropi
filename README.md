@@ -48,6 +48,8 @@ node "/path/to/skills/tripi-tropi/scripts/launch.mjs" --repo "/path/to/my repo"
 
 The launcher opens the browser and returns immediately. Add `--no-open` to print the URL only, or `--thread "session UUID or exact name"` to set the initial Codex queue destination. Without a linked session, browsing still works. In the viewer, click the Codex destination to choose an existing session from the local Codex index or unlink it. The `Exit` button stops only this viewer process and leaves the browser tab open. Local network/process/browser permissions remain governed by the host environment.
 
+An exact session name must identify one entry in the local Codex index; the viewer stores its UUID as the destination. Existing send records under that name are retained for duplicate protection. Queue and copy actions require a structurally valid ticket with `Execution: pending`, agent approval, and completed valid dependencies. Legacy Markdown remains browsable; fix validation errors before requesting implementation. Feature-filtered discovery and validation resolve dependencies across the entire repository before filtering results.
+
 To check whether a viewer is already active for a repository, run the launcher again with the same repository and `--no-open`:
 
 ```sh

@@ -39,9 +39,11 @@ export async function installSkill({ skillsDir = path.join(homedir(), '.agents/s
   const overlaps = (a, b) => { const relative = path.relative(a, b); return !relative || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative)); };
   if (overlaps(source, target) || overlaps(target, source)) throw new Error('Choose a skills directory outside the source package.');
   let existing = false;
+  let originalStat;
   try {
     const stat = await lstat(target);
     existing = true;
+    originalStat = stat;
     if (!update) throw new Error(`Already installed at ${target}. Stop its viewers and pass --update to replace it explicitly.`);
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error('Refusing to replace a link or non-directory. Choose another --skills-dir.');
     const record = JSON.parse(await readFile(path.join(target, marker), 'utf8').catch(() => '{}'));
@@ -54,11 +56,14 @@ export async function installSkill({ skillsDir = path.join(homedir(), '.agents/s
     if (error.code === 'EEXIST') throw new Error(`Another installation is running. Retry later; if it exited, remove the stale lock ${lock}.`);
     throw error;
   }
-  let stage; let backup;
+  let stage; let backup; let ownsTarget = false;
+  async function checkTarget() {
+    const current = await lstat(target).catch((error) => { if (error.code === 'ENOENT') return null; throw error; });
+    if (Boolean(current) !== existing || (current && (current.isSymbolicLink() || current.dev !== originalStat.dev || current.ino !== originalStat.ino))) throw new Error('Installation changed concurrently. Retry with the intended options.');
+  }
   try {
     // Recheck after acquiring the lock to prevent an unapproved replacement.
-    const nowExists = await lstat(target).then(() => true, (error) => { if (error.code === 'ENOENT') return false; throw error; });
-    if (nowExists !== existing) throw new Error('Installation changed concurrently. Retry with the intended options.');
+    await checkTarget();
     stage = await mkdtemp(path.join(parent, '.tripi-tropi-stage-'));
     for (const filename of files) await cp(path.join(source, filename), path.join(stage, filename === 'SKILL.md' ? 'SKILL.pending' : filename), { recursive: true, dereference: false });
     // Codex must not discover an incomplete stage, even when scanning hidden directories.
@@ -68,6 +73,7 @@ export async function installSkill({ skillsDir = path.join(homedir(), '.agents/s
     if (!/^---\r?\nname: tripi-tropi\r?\ndescription: .+\r?\n---/.test(metadata)) throw new Error('Invalid skill metadata; installation was not activated.');
     await run(process.execPath, ['--input-type=module', '-e', "await import('./scripts/server.mjs'); await Promise.all(['marked/lib/marked.umd.js','dompurify/dist/purify.min.js','gsap/dist/gsap.min.js'].map(p=>import('node:fs/promises').then(fs=>fs.access('node_modules/'+p))))"], stage);
     await writeFile(path.join(stage, marker), JSON.stringify({ installer: 'tripi-tropi', format: 1, version: JSON.parse(await readFile(path.join(stage, 'package.json'))).version }, null, 2));
+    await checkTarget();
     if (existing) {
       backup = await mkdtemp(path.join(parent, '.tripi-tropi-backup-'));
       await rm(backup, { recursive: true });
@@ -76,14 +82,16 @@ export async function installSkill({ skillsDir = path.join(homedir(), '.agents/s
     try {
       if (backup) await rename(path.join(backup, 'SKILL.md'), path.join(backup, 'SKILL.pending'));
       await rename(stage, target);
+      ownsTarget = true;
       stage = null;
       await rename(path.join(target, 'SKILL.pending'), path.join(target, 'SKILL.md'));
     } catch (error) {
       // Activation failure restores the complete previous package.
-      await rm(target, { recursive: true, force: true });
+      if (ownsTarget) await rm(target, { recursive: true, force: true });
       if (backup) {
         if (await access(path.join(backup, 'SKILL.pending')).then(() => true, () => false)) await rename(path.join(backup, 'SKILL.pending'), path.join(backup, 'SKILL.md'));
-        await rename(backup, target); backup = null;
+        try { await rename(backup, target); backup = null; }
+        catch (restoreError) { throw new Error(`Activation failed: ${error.message}. Previous installation preserved at ${backup}; restore failed: ${restoreError.message}`); }
       }
       throw error;
     }

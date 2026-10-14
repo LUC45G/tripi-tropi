@@ -48,7 +48,8 @@ async function addSessionDetails(codexHome, sessions) {
           return record.payload;
         } catch { return null; }
       }
-    } finally { lines.close(); input.destroy(); }
+    } catch { return null; }
+    finally { lines.close(); input.destroy(); }
     return null;
   };
   const visit = async (directory) => {
@@ -80,4 +81,16 @@ export async function readThreadName(thread, codexHome = defaultHome()) {
 /** Read only display-safe identifiers and names from Codex's local session index. */
 export async function listCodexSessions(codexHome = defaultHome()) {
   return readSessions(codexHome);
+}
+
+/** Names are only accepted when the local index identifies one exact destination. */
+export async function resolveCodexThread(value, resolveSessions = listCodexSessions) {
+  const destination = value.trim();
+  if (!destination) return '';
+  if (/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(destination)) return destination.toLowerCase();
+  const sessions = await resolveSessions();
+  if (sessions.some((session) => session.id === destination)) return destination;
+  const matches = sessions.filter((session) => session.name === destination);
+  if (matches.length !== 1) throw new Error('Session name must match exactly one entry in the local Codex index. Use its UUID instead.');
+  return matches[0].id;
 }
