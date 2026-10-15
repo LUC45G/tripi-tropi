@@ -9,6 +9,7 @@ import { loadTickets } from './tickets.mjs';
 import { deriveTicketStates } from './ticket-states.mjs';
 import { readThreadName, listCodexSessions, resolveCodexThread } from './thread-name.mjs';
 import { planComponent, componentMessage } from './component-plan.mjs';
+import { clarificationMessage } from './clarification.mjs';
 
 export function queueMessage({ thread, message, repo, spawnProcess = spawn, timeout = 30000 }) {
   return new Promise((resolve, reject) => {
@@ -82,12 +83,15 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
   }
   let records = await readRecords(thread);
   let writes = Promise.resolve();
+  const clarificationKey = (id) => `@clarify:${id}`;
+  const hasClarification = (id) => records[clarificationKey(id)] && records[clarificationKey(id)].status !== 'Released';
   async function prepareMessage(id) {
     if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
     const data = await loadTickets(repo, { strict: true });
     const tickets = new Map(deriveTicketStates(data.tickets).map((item) => [item.id, item]));
     const ticket = tickets.get(id);
     if (!ticket) return { code: 404, error: 'Ticket no longer exists.' };
+    if (hasClarification(id)) return { code: 409, error: 'A clarification is pending. Finish it before requesting implementation.' };
     if (ticket.displayState !== 'Ready to implement' || ticket.triageRole !== 'ready-for-agent' || ticket.execution !== 'pending') return { code: 409, error: 'Ticket is no longer ready for the agent. Refresh its current state.' };
     const dependencies = [...ticket.dependencies];
     const checked = new Set();
@@ -99,8 +103,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     }
     return { code: 200, message: implementationMessage(repo, ticket) };
   }
-  function persist() {
-    const value = JSON.stringify(records);
+  function persist(value = JSON.stringify(records)) {
     const next = writes.then(async () => {
       await mkdir(stateDirectory, { recursive: true });
       const ledger = ledgerFor(thread);
@@ -116,7 +119,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
       records[batch.id] = { ...record, tickets: ids, pauseBefore: batch.pauseBefore };
       for (const key of resumed) records[key] = { ...records[key], status: 'Paused', acknowledgedAt: record.at, supersededBy: batch.id };
     }
-    for (const id of ids) records[id] = { ...record };
+    for (const id of ids) records[id] = { ...record, ...(records[id]?.status === 'Released' ? { previous: records[id] } : {}) };
     try {
       // Reserve every pending member before delivery, including those after a possible pause.
       await persist();
@@ -136,6 +139,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     const tickets = deriveTicketStates(data.tickets);
     const result = planComponent(tickets, id);
     if (result.code !== 200) return result;
+    if (result.plan.order.some((ticket) => hasClarification(ticket.id))) return { code: 409, error: 'A clarification is pending for this work. Finish it before requesting implementation.' };
     const byId = new Map(tickets.map((ticket) => [ticket.id, ticket]));
     const conflicts = result.plan.order.filter((ticket) => Object.hasOwn(records, ticket.id)).map((ticket) => {
       const receipt = records[ticket.id]; const batch = records[receipt.batch];
@@ -158,6 +162,28 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     if (reviewed.conflicts.length && (!reviewed.requiresPausedConfirmation || options.confirmPaused !== true)) return { code: 409, error: reviewed.requiresPausedConfirmation ? 'Confirm that the earlier agent flow is paused before manually resuming its remaining tickets.' : 'A send was already attempted for this work. Check the linked session; automatic retries are disabled.', conflicts: reviewed.conflicts };
     return { ...reviewed, message: componentMessage(repo, reviewed.plan) };
   }
+  async function reviewClarification(id, note = '') {
+    if (typeof id !== 'string' || id.length > 1000 || typeof note !== 'string' || note.length > 2000) return { code: 400, error: 'Expected a ticket identifier and a note of at most 2000 characters.' };
+    const data = await loadTickets(repo, { strict: true });
+    const tickets = deriveTicketStates(data.tickets); const byId = new Map(tickets.map((ticket) => [ticket.id, ticket]));
+    const ticket = byId.get(id);
+    if (!ticket) return { code: 404, error: 'Ticket no longer exists.' };
+    if (ticket.execution === 'discarded' || ticket.triageRole === 'wontfix') return { code: 409, error: 'This ticket is discarded or marked wontfix.' };
+    const ids = new Set([id]);
+    for (const key of ids) for (const dependency of byId.get(key)?.dependencies ?? []) if (dependency.id) ids.add(dependency.id);
+    const record = records[clarificationKey(id)] ?? null;
+    const implementation = !['completed', 'discarded'].includes(ticket.execution) ? records[id] ?? null : null;
+    const message = clarificationMessage(repo, ticket, note);
+    const fingerprint = JSON.stringify({ repo, thread, message, record, implementation, triage: data.triageRoles, files: [...ids].sort().map((key) => [key, byId.get(key)?.content]) });
+    return { code: 200, message, record, implementation, execution: ticket.execution, reviewToken: createHmac('sha256', reviewSecret).update(fingerprint).digest('hex') };
+  }
+  async function prepareClarification(id, options) {
+    const review = await reviewClarification(id, options.note);
+    if (review.code !== 200) return review;
+    const supplied = Buffer.from(typeof options.reviewToken === 'string' ? options.reviewToken : ''); const expected = Buffer.from(review.reviewToken);
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return { code: 409, error: 'The ticket, destination or request changed. Preview the message again.' };
+    return review;
+  }
   return {
     info: () => ({ thread: thread || null, threadName, token, records }),
     async listSessions() { return resolveSessions(); },
@@ -178,6 +204,37 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
       threadName = await resolveThreadName(thread).catch(() => null);
     },
     async copyMessage(id) { return prepareMessage(id); },
+    async reviewClarification(id, note) { return reviewClarification(id, note); },
+    async copyClarification(id, options = {}) {
+      const review = await prepareClarification(id, options);
+      if (review.code !== 200) return review;
+      if (review.implementation || review.execution !== 'completed' && records[id] || hasClarification(id)) return { code: 409, error: 'A request is already pending. Check the agent before starting another clarification.' };
+      return review;
+    },
+    async enqueueClarification(id, options = {}) {
+      if (!thread || changingThread) return { code: 409, error: 'Link a stable Codex destination before sending.' };
+      activeSends++;
+      try {
+        const review = await prepareClarification(id, options);
+        if (review.code !== 200) return review;
+        if (review.implementation || review.execution !== 'completed' && records[id] || hasClarification(id)) return { code: 409, error: 'A request is already pending. Check the agent before starting another clarification.' };
+        return await sendAttempt([clarificationKey(id)], review.message);
+      } finally { activeSends--; }
+    },
+    async releaseClarification(id, options = {}) {
+      if (!thread || changingThread || options.confirmEnded !== true) return { code: 409, error: 'Confirm that the previous review has ended. This does not cancel the agent.' };
+      activeSends++;
+      try {
+        const review = await prepareClarification(id, options);
+        if (review.code !== 200) return review;
+        const key = clarificationKey(id); const record = records[key];
+        if (!record || record.status === 'Released' || record.status === 'Sending' || record !== review.record) return { code: 409, error: 'This clarification cannot be released now. Refresh its delivery status.' };
+        const released = { ...record, status: 'Released', acknowledgedAt: new Date().toISOString() };
+        await persist(JSON.stringify({ ...records, [key]: released }));
+        records[key] = released;
+        return { code: 200, record: records[key] };
+      } finally { activeSends--; }
+    },
     async reviewComponent(id) { return reviewComponent(id); },
     async copyComponent(id, options) { return prepareComponent(id, options); },
     async enqueueComponent(id, options) {
@@ -189,7 +246,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
         if (prepared.code !== 200) return prepared;
         const ids = prepared.plan.order.map((ticket) => ticket.id);
         // Recheck after asynchronous disk reads: another request may have reserved work.
-        if (ids.some((key) => Object.hasOwn(records, key) && !prepared.conflicts.some((conflict) => conflict.ticket === key && conflict.resumable && records[key].batch === conflict.batch && records[key].status === conflict.status))) return { code: 409, error: 'A send was already attempted. Review the component again.' };
+        if (ids.some((key) => hasClarification(key) || Object.hasOwn(records, key) && !prepared.conflicts.some((conflict) => conflict.ticket === key && conflict.resumable && records[key].batch === conflict.batch && records[key].status === conflict.status))) return { code: 409, error: 'A send was already attempted. Review the component again.' };
         const batch = { id: `@batch:${randomBytes(16).toString('hex')}`, pauseBefore: prepared.plan.pauseBefore };
         return await sendAttempt(ids, prepared.message, batch, [...new Set(prepared.conflicts.map((conflict) => conflict.batch))]);
       } finally { activeSends--; }
@@ -202,7 +259,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
       try {
         const prepared = await prepareMessage(id);
         if (prepared.code !== 200) return prepared;
-        if (Object.hasOwn(records, id)) return { code: 409, error: 'A send was already attempted. Check the linked session; automatic retries are disabled.', record: records[id] };
+        if (hasClarification(id) || Object.hasOwn(records, id)) return { code: 409, error: 'A send was already attempted. Check the linked session; automatic retries are disabled.', record: records[id] };
         return await sendAttempt([id], prepared.message);
       } finally { activeSends--; }
     },

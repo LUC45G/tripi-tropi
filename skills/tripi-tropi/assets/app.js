@@ -228,14 +228,15 @@ function diagnostics(items) {
 }
 
 function queueControls(ticket) {
+  const clarify = ticket.execution !== 'discarded' && ticket.triageRole !== 'wontfix' ? `<section class="clarification-controls"><button type="button" class="refresh" data-clarify="${escapeHTML(ticket.id)}" ${!queueInfo.token ? 'disabled' : ''}>Clarify ticket</button></section>` : '';
   const record = Object.hasOwn(queueInfo.records, ticket.id) ? queueInfo.records[ticket.id] : null;
   const ready = ticket.displayState === 'Ready to implement' && ticket.triageRole === 'ready-for-agent';
-  if (!ready && !record) return '';
+  if (!ready && !record) return clarify;
   const disabled = !queueInfo.thread || !queueInfo.token || Boolean(record);
   const button = ready ? `<button type="button" class="refresh" data-queue="${escapeHTML(ticket.id)}" ${disabled ? 'disabled' : ''}>${escapeHTML(record?.status ?? 'Queue implementation')}</button>` : '';
   const copyButton = ready ? `<button type="button" class="refresh" data-copy-message="${escapeHTML(ticket.id)}" ${!queueInfo.token ? 'disabled' : ''}>Copy implementation message</button>` : '';
   const message = record?.error ?? (record ? 'Delivery status only; ticket execution is shown separately. Check the linked session before any new send.' : queueInfo.thread ? 'Send this ticket to the linked Codex session after its current turn.' : 'No Codex session linked. Launch with --thread to enable sending.');
-  return `<section class="queue-controls">${button}${copyButton}<p data-queue-status role="status" class="${record?.error ? 'error-text' : 'muted'}">${escapeHTML(message)}${ready ? ' Copy the message to paste into Claude, OpenCode, or another agent manually.' : ''}</p></section>`;
+  return `${clarify}<section class="queue-controls">${button}${copyButton}<p data-queue-status role="status" class="${record?.error ? 'error-text' : 'muted'}">${escapeHTML(message)}${ready ? ' Copy the message to paste into Claude, OpenCode, or another agent manually.' : ''}</p></section>`;
 }
 
 function ticketBody(content) {
@@ -760,6 +761,87 @@ el('detail').addEventListener('click', (event) => {
   const link = event.target.closest('[data-ticket]');
   if (!link) return;
   event.preventDefault(); navigateTicket(link.dataset.ticket);
+});
+let clarifyState = null;
+let clarifyPointerOutside = false;
+function closeClarification() {
+  clarifyState = null; clarifyPointerOutside = false; el('clarify-dialog').close();
+  el('detail').querySelector('.clarification-controls > button')?.focus();
+}
+function updateClarification() {
+  const state = clarifyState; if (!state) return;
+  const pending = state.data?.record && state.data.record.status !== 'Released';
+  const blocked = state.busy || !state.data || state.failed || pending || state.data?.implementation || state.thread !== queueInfo.thread;
+  el('clarify-copy').disabled = Boolean(blocked);
+  el('clarify-queue').disabled = Boolean(blocked || !queueInfo.thread);
+  el('clarify-preview').disabled = state.busy;
+  el('clarify-note').disabled = state.busy;
+  el('clarify-release-section').hidden = !pending;
+  el('clarify-release').disabled = Boolean(state.busy || !el('clarify-confirm').checked || state.data?.record?.status === 'Sending');
+  el('clarify-message').textContent = state.data?.message ?? '';
+  el('clarify-status').textContent = state.status || (pending ? `${state.data.record.status}. Check the agent before allowing another clarification.` : state.data?.implementation ? 'An implementation request is already registered. Continue in the linked agent session.' : !queueInfo.thread ? 'Copy the message to paste into your agent. No Codex destination is linked.' : 'Review the message before copying or sending.');
+  el('clarify-error').textContent = state.error ?? '';
+}
+async function clarificationRequest(route, payload) {
+  const response = await fetch(`/api/clarification-${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Queue-Token': queueInfo.token }, body: JSON.stringify(payload) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? 'Could not process clarification.');
+  return result;
+}
+async function runClarification(action) {
+  const state = clarifyState; if (!state || state.busy) return;
+  if (action !== 'preview' && el(`clarify-${action}`).disabled) return;
+  const note = el('clarify-note').value;
+  state.busy = true; state.error = ''; state.status = action === 'queue' ? 'Sending clarification…' : 'Checking current ticket…'; updateClarification();
+  try {
+    const payload = { ticket: state.ticket, note };
+    if (action !== 'preview') payload.reviewToken = state.data.reviewToken;
+    if (action === 'release') payload.confirmEnded = el('clarify-confirm').checked;
+    const result = await clarificationRequest(action === 'preview' ? 'review' : action === 'copy' ? 'message' : action, payload);
+    if (action === 'copy') {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable.');
+      await navigator.clipboard.writeText(result.message);
+      state.status = 'Clarification message copied. Nothing was queued.';
+    } else {
+      state.data = action === 'preview' ? result : await clarificationRequest('review', { ticket: state.ticket, note });
+      state.thread = queueInfo.thread; state.failed = false;
+      state.status = action === 'queue' ? 'Queued. Delivery only; answer the questions in the agent CLI.' : action === 'release' ? 'Another clarification is allowed. Nothing was sent or cancelled.' : '';
+      if (clarifyState === state) el('clarify-confirm').checked = false;
+    }
+  } catch (error) {
+    state.error = `${error.message}${action === 'queue' ? ' No automatic retry was sent. Check the linked session.' : ''}`;
+    state.failed = true; state.status = '';
+    if (clarifyState !== state && action === 'queue') { el('error').textContent = state.error; el('error').hidden = false; }
+  } finally {
+    state.busy = false;
+    if (action === 'queue' || action === 'release') { await loadQueue(); render(); }
+    if (clarifyState === state) updateClarification();
+  }
+}
+el('detail').addEventListener('click', (event) => {
+  const button = event.target.closest('.clarification-controls > button[data-clarify]');
+  if (!button || button.disabled) return;
+  clarifyState = { ticket: button.dataset.clarify, data: null, busy: false, thread: queueInfo.thread };
+  const ticket = snapshot.tickets.find((item) => item.id === clarifyState.ticket);
+  el('clarify-dialog').innerHTML = `<h2 id="clarify-title" tabindex="-1">Clarify ticket ${String(ticket.number).padStart(2, '0')}</h2><p>${escapeHTML(ticket.title)}</p><label for="clarify-note">Optional note</label><textarea id="clarify-note" rows="3" maxlength="2000"></textarea><pre id="clarify-message" aria-label="Clarification message preview"></pre><p id="clarify-error" role="alert" class="error-text"></p><p id="clarify-status" role="status"></p><section id="clarify-release-section" hidden><label><input id="clarify-confirm" type="checkbox"> The previous review has ended. Allowing another request does not cancel the agent.</label><button id="clarify-release" type="button" class="refresh" data-clarify-action="release">Allow new clarification</button></section><div class="component-actions"><button type="button" class="refresh" data-clarify-action="close">Cancel</button><button id="clarify-preview" type="button" class="refresh" data-clarify-action="preview">Preview message</button><button id="clarify-copy" type="button" class="refresh" data-clarify-action="copy">Copy clarification message</button><button id="clarify-queue" type="button" class="refresh" data-clarify-action="queue">Queue clarification</button></div>`;
+  el('clarify-dialog').showModal(); el('clarify-title').focus(); runClarification('preview');
+});
+el('clarify-dialog').addEventListener('input', (event) => {
+  if (event.target.id === 'clarify-note' && clarifyState) { clarifyState.data = null; clarifyState.status = 'Preview the updated message before continuing.'; clarifyState.error = ''; }
+  updateClarification();
+});
+function outsideClarification(event) {
+  const box = el('clarify-dialog').getBoundingClientRect();
+  return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+}
+el('clarify-dialog').addEventListener('pointerdown', (event) => { clarifyPointerOutside = event.button === 0 && outsideClarification(event); });
+el('clarify-dialog').addEventListener('pointercancel', () => { clarifyPointerOutside = false; });
+el('clarify-dialog').addEventListener('cancel', (event) => { event.preventDefault(); closeClarification(); });
+el('clarify-dialog').addEventListener('click', (event) => {
+  const dismiss = clarifyPointerOutside && outsideClarification(event); clarifyPointerOutside = false;
+  const action = event.target.closest('[data-clarify-action]')?.dataset.clarifyAction;
+  if (dismiss || action === 'close') closeClarification();
+  else if (action) runClarification(action);
 });
 el('detail').addEventListener('click', async (event) => {
   const copyButton = event.target.closest('.queue-controls > button[data-copy-message]');

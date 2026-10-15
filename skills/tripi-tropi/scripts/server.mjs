@@ -38,7 +38,7 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
     let pathname;
     try { pathname = new URL(request.url, `http://${expectedHost}`).pathname; }
     catch { return json(400, { error: 'Invalid URL.' }); }
-    if (request.method === 'POST' && ['/api/queue', '/api/implementation-message', '/api/session', '/api/component-plan', '/api/component-message', '/api/component-queue'].includes(pathname)) {
+    if (request.method === 'POST' && ['/api/queue', '/api/implementation-message', '/api/session', '/api/component-plan', '/api/component-message', '/api/component-queue', '/api/clarification-review', '/api/clarification-message', '/api/clarification-queue', '/api/clarification-release'].includes(pathname)) {
       const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
       const expected = Buffer.from(queue.info().token);
       if (request.headers.origin !== `http://${expectedHost}` || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return json(403, { error: 'A same-origin queue session token is required.' });
@@ -58,6 +58,14 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
           if (result.code !== 200) return json(result.code, { error: result.error });
           await queue.refreshThreadName();
           return json(200, queue.info());
+        }
+        if (pathname.startsWith('/api/clarification-')) {
+          const review = pathname === '/api/clarification-review';
+          const release = pathname === '/api/clarification-release';
+          const fields = review ? ['ticket', 'note'] : release ? ['ticket', 'note', 'reviewToken', 'confirmEnded'] : ['ticket', 'note', 'reviewToken'];
+          if (!payload || Array.isArray(payload) || typeof payload.ticket !== 'string' || Object.keys(payload).some((key) => !fields.includes(key)) || (Object.hasOwn(payload, 'note') && typeof payload.note !== 'string') || (!review && (typeof payload.reviewToken !== 'string' || !/^[a-f\d]{64}$/.test(payload.reviewToken))) || (Object.hasOwn(payload, 'confirmEnded') && typeof payload.confirmEnded !== 'boolean')) return json(400, { error: 'Expected a ticket identifier, optional note and documented preview/confirmation fields.' });
+          const result = review ? await queue.reviewClarification(payload.ticket, payload.note) : pathname === '/api/clarification-message' ? await queue.copyClarification(payload.ticket, payload) : release ? await queue.releaseClarification(payload.ticket, payload) : await queue.enqueueClarification(payload.ticket, payload);
+          return json(result.code, result);
         }
         if (pathname.startsWith('/api/component-')) {
           const review = pathname === '/api/component-plan';
