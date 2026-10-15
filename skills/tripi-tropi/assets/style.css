@@ -110,6 +110,17 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px soli
 .graph-dimmed { opacity: .35; }
 .graph-node.graph-dimmed:hover, .graph-node.graph-dimmed:focus-visible, .graph-node.graph-dimmed[aria-pressed="true"] { opacity: 1; }
 .graph-tooltip { position: absolute; bottom: 8px; left: 12px; right: 12px; max-height: 40%; overflow: hidden; margin: 0; padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; pointer-events: none; }
+#component-dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; padding: 24px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--panel); color: var(--text); line-height: 1.6; }
+#component-dialog::backdrop { background: #0009; }
+#component-dialog h2 { margin: 0 0 12px; font-size: 20px; }
+#component-dialog h3 { font-size: 14px; margin-bottom: 6px; }
+#component-dialog p, #component-dialog li { overflow-wrap: anywhere; }
+#component-dialog h2:focus { outline: none; }
+.component-ticket { border: 0; border-bottom: 1px dotted var(--muted); background: none; padding: 0; text-align: left; color: var(--accent); }
+.component-warning { display: block; padding: 12px; margin: 16px 0; border: 1px solid #705c36; border-radius: 5px; background: #443922; }
+.component-warning p { margin-top: 0; }
+.component-warning input { accent-color: var(--accent); }
+.component-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 table { border-collapse: collapse; width: 100%; text-align: left; table-layout: fixed; min-width: 480px; }
 thead { background: #17232f; position: sticky; top: 0; z-index: 1; }
 th { padding: 12px 12px; color: var(--muted); font-size: 11px; font-weight: 600; border-bottom: 1px solid var(--line); }

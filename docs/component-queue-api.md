@@ -1,6 +1,8 @@
 # API de planificación de componentes
 
-Servicio de graph-view 03, independiente de los controles visuales del futuro ticket 04. Una solicitud entrega **una instrucción secuencial al agente**; no crea un scheduler en el viewer ni implementa tickets por sí misma.
+Servicio de graph-view 03, utilizado por los controles visuales de 04. En el grafo, aislar el componente y elegir `Review component` abre la revisión accesible con orden, completados, advertencias y confirmaciones. Una solicitud entrega **una instrucción secuencial al agente**; no crea un scheduler en el viewer ni implementa tickets por sí misma.
+
+La UI invalida revisiones y limpia confirmaciones si cambian los tickets relevantes o el contexto de feature, filtros, aislamiento o destino. No revisa ni reenvía automáticamente: se usa `Review again`. `Cancel`/Escape cierran una revisión sin enviar; una entrega ya iniciada continúa si se cierra el diálogo o el viewer.
 
 ## Autenticación y entradas
 

@@ -16,6 +16,9 @@ let graphWorkspaces = Object.create(null);
 let currentGraph;
 let graphGesture = null;
 let suppressGraphClick = false;
+let componentReview = null;
+let componentGeneration = 0;
+let componentBusy = false;
 let layout = { sidebar: 220, split: 50 };
 let sidebarCollapsed = false;
 let storageTimer;
@@ -404,7 +407,7 @@ function renderGraph() {
       ${problems.length ? '<g class="graph-warning" aria-hidden="true"><circle cx="23" cy="-23" r="9"/><text x="23" y="-20" text-anchor="middle">!</text></g>' : ''}
     </g>`;
   }).join('');
-  el('ticket-graph').innerHTML = `<div class="graph-tools" role="group" aria-label="Graph controls"><button type="button" class="refresh" data-graph-action="zoom-in" aria-label="Zoom in">+</button><button type="button" class="refresh" data-graph-action="zoom-out" aria-label="Zoom out">−</button><output id="graph-zoom" aria-label="Graph zoom"></output><button type="button" class="refresh" data-graph-action="fit">Fit graph</button><button type="button" class="refresh" data-graph-action="rearrange">Rearrange</button><button type="button" class="refresh" data-graph-action="isolate" ${!selectedTicket ? 'disabled' : ''}>Isolate component</button><button type="button" class="refresh" data-graph-action="all" ${!state.isolated ? 'disabled' : ''}>Show all</button></div><p class="graph-legend" id="graph-legend">Blocker → dependent. Arrowhead only: external dependency. Border: label. Fill: state. !: validation error. Drag nodes or the background. Focus a node and use arrow keys to move it.</p><svg class="graph-canvas" role="group" aria-label="Ticket dependency graph" aria-describedby="graph-legend"><defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/></marker></defs>${edges}${nodes}</svg><p class="graph-tooltip" id="graph-tooltip" role="tooltip" hidden></p>`;
+  el('ticket-graph').innerHTML = `<div class="graph-tools" role="group" aria-label="Graph controls"><button type="button" class="refresh" data-graph-action="zoom-in" aria-label="Zoom in">+</button><button type="button" class="refresh" data-graph-action="zoom-out" aria-label="Zoom out">−</button><output id="graph-zoom" aria-label="Graph zoom"></output><button type="button" class="refresh" data-graph-action="fit">Fit graph</button><button type="button" class="refresh" data-graph-action="rearrange">Rearrange</button><button type="button" class="refresh" data-graph-action="isolate" ${!selectedTicket ? 'disabled' : ''}>Isolate component</button><button type="button" class="refresh" data-graph-action="all" ${!state.isolated ? 'disabled' : ''}>Show all</button><button type="button" class="refresh" data-graph-action="review" ${!state.isolated || !queueInfo.token || componentBusy ? 'disabled' : ''}>Review component</button></div><p class="graph-legend" id="graph-legend">Blocker → dependent. Arrowhead only: external dependency. Border: label. Fill: state. !: validation error. Drag nodes or the background. Focus a node and use arrow keys to move it.</p><svg class="graph-canvas" role="group" aria-label="Ticket dependency graph" aria-describedby="graph-legend"><defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/></marker></defs>${edges}${nodes}</svg><p class="graph-tooltip" id="graph-tooltip" role="tooltip" hidden></p>`;
   updateGraphGeometry();
 }
 
@@ -442,6 +445,122 @@ function zoomGraph(factor, point) {
   state.view.y = clamp(anchor.y - (anchor.y - state.view.y) * old / state.view.zoom, -state.height * 4, state.height * 4);
   updateGraphGeometry(); persistWorkspace();
 }
+
+function componentContext(root) {
+  const graph = projectGraph(snapshot.tickets, selectedFeature);
+  const ids = graphComponent(graph, root);
+  const byId = new Map(snapshot.tickets.map((ticket) => [ticket.id, ticket]));
+  for (const id of ids) for (const dependency of byId.get(id)?.dependencies ?? []) if (dependency.id) ids.add(dependency.id);
+  return JSON.stringify({ feature: selectedFeature, isolated: graphWorkspaces[selectedFeature]?.isolated, view: ticketView, state: selectedState, labels: [...selectedLabels].sort(), thread: queueInfo.thread,
+    files: [...ids].sort().map((id) => [id, byId.get(id)?.content]), triage: snapshot.triageRoles });
+}
+function closeComponentReview() {
+  componentGeneration++; componentReview = null;
+  el('component-dialog').close();
+  (el('ticket-graph').querySelector('[data-graph-action="review"]:enabled') ?? el('ticket-graph').querySelector('[data-graph-action="fit"]'))?.focus();
+}
+async function componentRequest(route, payload) {
+  const response = await fetch(`/api/component-${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Queue-Token': queueInfo.token }, body: JSON.stringify(payload) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? 'Could not process this component.');
+  return result;
+}
+function componentButtons() {
+  if (!componentReview) return;
+  const review = componentReview; const data = review.data;
+  const conflicts = data?.conflicts.length && !data.requiresPausedConfirmation;
+  const disabled = componentBusy || !data || review.invalid || review.delivered || review.deliveryFailed || conflicts || (data.plan.warnings.length && !review.confirmExternal) || (data.requiresPausedConfirmation && !review.confirmPaused);
+  const queue = el('component-dialog').querySelector('[data-component-action="queue"]');
+  const copy = el('component-dialog').querySelector('[data-component-action="copy"]');
+  if (queue) queue.disabled = Boolean(disabled || !queueInfo.thread);
+  if (copy) copy.disabled = Boolean(disabled);
+}
+function renderComponentReview() {
+  if (!componentReview) return;
+  const focused = el('component-dialog').contains(document.activeElement) ? document.activeElement.dataset.componentAction : null;
+  const review = componentReview; const data = review.data;
+  const ticketLink = (id, title) => `<button type="button" class="component-ticket" data-component-ticket="${escapeHTML(id)}">${escapeHTML(title)}</button>`;
+  const context = data ? `<p>Filters do not exclude tickets from this component.</p><h3>Implementation order</h3><ol class="component-order">${data.plan.order.map((ticket) => `<li>${ticketLink(ticket.id, `${String(ticket.number).padStart(2, '0')}: ${ticket.title}`)}</li>`).join('')}</ol><h3>Already completed</h3><ul>${data.plan.completed.length ? data.plan.completed.map((id) => `<li>${ticketLink(id, data.plan.component.find((ticket) => ticket.id === id)?.title ?? id)}</li>`).join('') : '<li>None</li>'}</ul>` : '';
+  const external = data?.plan.warnings.length ? `<section class="component-warning"><p>This ticket has an external dependency. The implementation flow will pause before completing the full set. Continue?</p><ul>${data.plan.warnings.map((warning) => `<li>${ticketLink(warning.ticket, warning.ticket)} depends on ${ticketLink(warning.dependency, `${warning.feature}:${String(warning.number).padStart(2, '0')} — ${warning.title}`)}</li>`).join('')}</ul><label><input type="checkbox" data-component-confirm="confirmExternal" ${review.confirmExternal ? 'checked' : ''} ${componentBusy || review.invalid || review.delivered ? 'disabled' : ''}> I understand that the flow will pause if this dependency is still unfinished.</label></section>` : '';
+  const pause = data?.requiresPausedConfirmation ? `<label class="component-warning"><input type="checkbox" data-component-confirm="confirmPaused" ${review.confirmPaused ? 'checked' : ''} ${componentBusy || review.invalid || review.delivered ? 'disabled' : ''}> I checked the agent CLI: the earlier flow is paused and will not resume these tickets.</label>` : '';
+  const conflict = data?.conflicts.length && !data.requiresPausedConfirmation ? '<p class="error-text">Some tickets already have a delivery attempt. Check the linked session; no automatic retry will be sent.</p>' : '';
+  el('component-dialog').innerHTML = `<h2 id="component-title" tabindex="-1">Review component</h2><p class="muted">${escapeHTML(queueInfo.thread ? `Codex: ${queueInfo.threadName || 'Unnamed session'} - ${queueInfo.thread}` : 'No Codex session linked. Copy the message or link a session before sending.')}</p>${context}${external}${pause}${conflict}<p class="muted">Questions are answered in the agent CLI. Closing the viewer does not cancel delivered work. Delivery is separate from ticket execution.</p>${review.error ? `<p role="alert" class="error-text">${escapeHTML(review.error)}</p>` : ''}<p id="component-status" role="status">${escapeHTML(review.status ?? '')}</p><div class="component-actions"><button type="button" class="refresh" data-component-action="close">${componentBusy || review.delivered ? 'Close' : 'Cancel'}</button><button type="button" class="refresh" data-component-action="review" ${componentBusy ? 'disabled' : ''}>Review again</button><button type="button" class="refresh" data-component-action="copy">${review.copied ? 'Copied' : 'Copy implementation message'}</button><button type="button" class="refresh" data-component-action="queue">${review.delivered ? 'Queued' : componentBusy && review.sending ? 'Sending' : data?.requiresPausedConfirmation ? 'Queue remaining tickets' : 'Queue component'}</button></div>`;
+  componentButtons();
+  if (focused && el('component-dialog').open) {
+    const target = el('component-dialog').querySelector(`[data-component-action="${focused}"]:enabled`) ?? el('component-status');
+    target.tabIndex = target.id === 'component-status' ? -1 : 0; target.focus();
+  }
+}
+function invalidateComponentContext() {
+  if (!componentReview || componentReview.invalid || componentReview.context === componentContext(componentReview.root)) return;
+  componentReview.invalid = true; componentReview.confirmExternal = false; componentReview.confirmPaused = false;
+  componentReview.error = 'The plan or workspace changed. Review again before continuing.';
+  renderComponentReview();
+  if (!componentBusy && el('component-dialog').open) el('component-dialog').querySelector('[data-component-action="review"]')?.focus();
+}
+async function openComponentReview() {
+  const root = graphWorkspaces[selectedFeature]?.isolated;
+  if (!root || componentBusy) return;
+  const generation = ++componentGeneration;
+  componentReview = { root, context: componentContext(root), data: null, status: 'Reviewing current tickets…' };
+  renderComponentReview();
+  if (!el('component-dialog').open) el('component-dialog').showModal();
+  el('component-title').focus();
+  try {
+    const data = await componentRequest('plan', { ticket: root });
+    if (generation !== componentGeneration) return;
+    invalidateComponentContext();
+    if (componentReview.invalid) return;
+    componentReview.data = data; componentReview.status = 'Review the order and required confirmations before continuing.';
+  } catch (error) {
+    if (generation !== componentGeneration) return;
+    componentReview.error = error.message; componentReview.status = 'This component cannot be scheduled in its current state.';
+  }
+  if (generation === componentGeneration) { renderComponentReview(); el('component-title').focus(); }
+}
+async function submitComponent(action) {
+  const review = componentReview;
+  if (!review || componentBusy) return;
+  invalidateComponentContext(); componentButtons();
+  if (el('component-dialog').querySelector(`[data-component-action="${action}"]`)?.disabled) return;
+  const generation = componentGeneration;
+  componentBusy = true; review.sending = action === 'queue'; review.error = '';
+  review.status = action === 'queue' ? 'Sending one instruction to Codex. Closing this dialog does not cancel delivery.' : 'Preparing the current implementation message…';
+  renderComponentReview(); render();
+  try {
+    const result = await componentRequest(action === 'queue' ? 'queue' : 'message', { ticket: review.root, reviewToken: review.data.reviewToken, confirmExternal: review.confirmExternal === true, confirmPaused: review.confirmPaused === true });
+    if (action === 'queue') {
+      review.delivered = true; review.status = 'Queued. Delivery only; follow implementation through the live ticket states.';
+    } else if (generation === componentGeneration && review.context === componentContext(review.root)) {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser context.');
+      await navigator.clipboard.writeText(result.message);
+      review.copied = true; review.status = 'Implementation message copied. Paste it manually into the agent CLI; nothing was queued.';
+    } else { review.invalid = true; review.error = 'The plan changed. Review again before copying.'; }
+  } catch (error) {
+    review.error = `${error.message}${action === 'queue' ? ' No retry was sent. Check the linked session before any new send.' : ''}`;
+    review.invalid = true; review.confirmExternal = false; review.confirmPaused = false;
+    review.deliveryFailed = action === 'queue';
+    if (generation !== componentGeneration && action === 'queue') { el('error').textContent = review.error; el('error').hidden = false; }
+  } finally {
+    componentBusy = false;
+    if (action === 'queue') await loadQueue();
+    render();
+    if (generation === componentGeneration) renderComponentReview();
+  }
+}
+el('component-dialog').addEventListener('cancel', (event) => { event.preventDefault(); closeComponentReview(); });
+el('component-dialog').addEventListener('click', (event) => {
+  const ticket = event.target.closest('[data-component-ticket]');
+  if (ticket) { const id = ticket.dataset.componentTicket; closeComponentReview(); navigateTicket(id); return; }
+  const action = event.target.closest('[data-component-action]')?.dataset.componentAction;
+  if (action === 'close') closeComponentReview();
+  if (action === 'review') openComponentReview();
+  if (action === 'copy' || action === 'queue') submitComponent(action);
+});
+el('component-dialog').addEventListener('change', (event) => {
+  const key = event.target.dataset.componentConfirm;
+  if (componentReview && ['confirmExternal', 'confirmPaused'].includes(key)) { componentReview[key] = event.target.checked; componentButtons(); }
+});
 
 function render() {
   const scroll = scrollPositions();
@@ -485,6 +604,7 @@ function render() {
   }
   if (openDiagnostics !== undefined && el('detail').querySelector('.diagnostics')) el('detail').querySelector('.diagnostics').open = openDiagnostics;
   restoreScroll(scroll); applyMobileView();
+  invalidateComponentContext();
 }
 
 function applySnapshot(data) {
@@ -563,6 +683,7 @@ function activateGraphNode(event) {
     const state = graphWorkspaces[selectedFeature];
     if (action === 'zoom-in' || action === 'zoom-out') zoomGraph(action === 'zoom-in' ? 1.25 : .8);
     if (action === 'fit') fitGraph();
+    if (action === 'review') { openComponentReview(); return; }
     if (action === 'rearrange') { state.positions = {}; state.view = {}; renderGraph(); fitGraph(); }
     if (action === 'isolate' || action === 'all') { state.isolated = action === 'isolate' ? selectedTicket : null; renderGraph(); fitGraph(); }
     if (['rearrange', 'isolate', 'all'].includes(action)) el('ticket-graph').querySelector(`[data-graph-action="${action === 'all' ? 'fit' : action}"]`)?.focus();

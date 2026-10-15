@@ -1,6 +1,6 @@
 # Catálogo de tests de tripi-tropi
 
-Inventario del checkout, basado en la versión **0.1.3** con graph-view 01–03: **69 tests declarados en 10 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
+Inventario del checkout, basado en la versión **0.1.3** con graph-view 01–04: **74 tests declarados en 11 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
 
 ## Clasificación
 
@@ -22,7 +22,8 @@ Esta clasificación documenta el alcance de los tests; el runner no tiene catego
 | `audit-regressions.test.mjs` | 1 | 7 | 1 | 9 |
 | `graph-view.test.mjs` | 6 | 0 | 4 | 10 |
 | `component-queue.test.mjs` | 4 | 8 | 0 | 12 |
-| **Total** | **23** | **34** | **12** | **69** |
+| `component-ui.test.mjs` | 0 | 0 | 5 | 5 |
+| **Total** | **23** | **34** | **17** | **74** |
 
 ## Parser y validación de tickets
 
@@ -130,7 +131,7 @@ Fuente: [tests/graph-view.test.mjs](../tests/graph-view.test.mjs).
 | `browser graph drags and pans without opening tickets, persists exploration and recalculates isolated components live` | E2E | Arrastre frente a click, aristas, movimiento por teclado, cámara, aislamiento, filtros, persistencia por feature, altas/bajas y layout móvil. | Explorar sin editar tickets ni perder contexto ante cambios en vivo. |
 | `browser graph preferences are isolated by repository on the same origin and tolerate unusable storage` | E2E | Repos distintos en el mismo origen, restauración de posiciones y storage inválido/deshabilitado. | Evitar contaminación entre proyectos y mantener el visor usable sin persistencia. |
 
-El E2E de instalación también comprueba que `/graph.mjs` se sirve desde la skill instalada. Los controles de programación de componentes corresponden a 04.
+El E2E de instalación también comprueba que `/graph.mjs` se sirve desde la skill instalada. Los controles de programación de componentes se verifican en component-ui.test.mjs.
 
 ## Planificación y entrega de componentes
 
@@ -151,7 +152,19 @@ Fuente: [tests/component-queue.test.mjs](../tests/component-queue.test.mjs). Con
 | `component HTTP endpoints enforce authentication, strict payloads and reviewed plan confirmation` | Integration | HTTP real: origen/token, Content-Type, campos permitidos, identificadores y revisión antes de copiar/enviar. | Mantener los límites de confianza en los tres endpoints nuevos. |
 | `component HTTP endpoints decode split Unicode and apply the byte limit on every new route` | Integration | Caracteres UTF-8 repartidos entre chunks y cuerpos superiores a 4096 bytes en plan/message/queue. | Decodificar correctamente y acotar las entradas del servicio. |
 
-La entrega se simula: las pruebas del mensaje verifican reglas de relectura, atomicidad, pausa, preguntas en CLI y commits. No observan una implementación real del conjunto ni prueban los controles de UI previstos en 04.
+La entrega se simula: las pruebas del mensaje verifican reglas de relectura, atomicidad, pausa, preguntas en CLI y commits. No observan una implementación real del conjunto.
+
+## Programación de componentes desde la UI
+
+Fuente: [tests/component-ui.test.mjs](../tests/component-ui.test.mjs). Navegador y servidor reales; entrega y portapapeles simulados.
+
+| Test | Categoría | Qué se prueba | Objetivo |
+| --- | --- | --- | --- |
+| `browser reviews full filtered components, copies without delivery and queues one instruction with separate delivery status` | E2E | Ramas, filtros atenuados, completados, copia sin ledger, foco al cancelar y doble activación durante Sending/Queued. | Revisar todo el conjunto y entregar una sola instrucción sin atribuir ejecución ni escribir tickets. |
+| `browser external confirmation cancels safely, resets on stale plans and links to blockers before review` | E2E | Advertencia/consentimiento externo, cancelación, contenido modificado en vivo, revalidación, navegación al bloqueante e inelegibilidad. | Exigir una decisión explícita vigente antes de copiar o encolar trabajo. |
+| `browser manually resumes paused component work with fresh acknowledgment and skips completed tickets` | E2E | Pausa previa simulada, prefijo y dependencia externa completados, nueva revisión y confirmación humana sin preselección. | Reanudar solo pendientes tras verificar que el flujo anterior no continuará por su cuenta. |
+| `browser allows unlinked copy, reports clipboard and delivery errors and never automatically retries` | E2E | Copia sin sesión, error de portapapeles, vinculación de sesión de usuario, fallo de entrega y reserva Error. | Permitir copia manual y detener reenvíos ante fallos, conservando el carácter de solo lectura. |
+| `browser invalidates review on history context changes and closing a pending delivery never resends it` | E2E | Historial que cambia filtros con el diálogo abierto, limpieza de consentimiento y cierre durante una entrega pendiente. | No reutilizar revisiones de otro contexto ni cancelar/repetir un envío al cerrar la UI. |
 
 ## Regresiones de la auditoría
 
@@ -186,7 +199,7 @@ node --test tests/tickets.test.mjs
 node --test --test-name-pattern="absence markers" tests/audit-regressions.test.mjs
 ```
 
-Los **11 tests de navegador** necesitan un ejecutable compatible con Chromium y Playwright. En Windows buscan Edge en su ubicación estándar; en otros sistemas hay que indicar el ejecutable. Si no está disponible, se marcan como **skipped**, por lo que una suite sin fallos no garantiza que se haya probado la UI.
+Los **16 tests de navegador** necesitan un ejecutable compatible con Chromium y Playwright. En Windows buscan Edge en su ubicación estándar; en otros sistemas hay que indicar el ejecutable. Si no está disponible, se marcan como **skipped**, por lo que una suite sin fallos no garantiza que se haya probado la UI.
 
 Ejemplo en PowerShell:
 
@@ -197,7 +210,7 @@ npm test
 
 El E2E de instalación puede necesitar acceso a npm o un cache utilizable para instalar dependencias. Los tests usan repositorios y destinos temporales y limpian sus fixtures; algunos tests de navegador guardan capturas en `.cache/` del checkout.
 
-La validación de los tickets actuales es un control adicional, separado de estos 69 tests:
+La validación de los tickets actuales es un control adicional, separado de estos 74 tests:
 
 ```sh
 npm run validate:tickets
