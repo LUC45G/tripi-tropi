@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Explorar las dependencias de los tickets en una vista alternativa a la lista y programar la implementación secuencial de un componente mediante una única instrucción al agente. Diseño confirmado por el usuario; esta feature está pendiente de implementación.
+Explorar las dependencias de los tickets en una vista alternativa a la lista y programar la implementación secuencial de un componente mediante una única instrucción al agente. Diseño confirmado por el usuario; implementación de 01–04 completada. Entrega al agente verificada con simulación, no con una implementación real del conjunto.
 
 ## Vista y alcance
 

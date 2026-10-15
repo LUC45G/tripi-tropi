@@ -1,9 +1,9 @@
 # 04: Programar componentes desde el grafo con revisión y confirmación
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: graph-view, frontend
 Blocked by: 02, 03
-Commits: none
+Commits: 9195e5a8fce7
 Verbosity: 1
 
 ## Estado inicial
@@ -37,4 +37,4 @@ Empieza solo con exploración y servicio completos en 02 y 03. Entrega una inter
 
 ## Estado posterior
 
-Pendiente.
+Programación desde el grafo disponible y verificada en 9195e5a8fce7; graph-view 01–04 completados, sin push.
