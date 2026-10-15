@@ -12,6 +12,7 @@ const skillVersion = JSON.parse(readFileSync(path.join(skillRoot, 'package.json'
 const staticFiles = new Map([
   ['/', ['assets/index.html', 'text/html']],
   ['/app.js', ['assets/app.js', 'text/javascript']],
+  ['/graph.mjs', ['assets/graph.mjs', 'text/javascript']],
   ['/style.css', ['assets/style.css', 'text/css']],
   ['/icon.svg', ['assets/icon.svg', 'image/svg+xml']],
   ['/vendor/marked.js', ['node_modules/marked/lib/marked.umd.js', 'text/javascript']],
@@ -37,7 +38,7 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
     let pathname;
     try { pathname = new URL(request.url, `http://${expectedHost}`).pathname; }
     catch { return json(400, { error: 'Invalid URL.' }); }
-    if (request.method === 'POST' && ['/api/queue', '/api/implementation-message', '/api/session'].includes(pathname)) {
+    if (request.method === 'POST' && ['/api/queue', '/api/implementation-message', '/api/session', '/api/component-plan', '/api/component-message', '/api/component-queue'].includes(pathname)) {
       const supplied = Buffer.from(String(request.headers['x-queue-token'] ?? ''));
       const expected = Buffer.from(queue.info().token);
       if (request.headers.origin !== `http://${expectedHost}` || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return json(403, { error: 'A same-origin queue session token is required.' });
@@ -57,6 +58,13 @@ export async function createViewer({ repo, port = 0, controlToken = '', thread =
           if (result.code !== 200) return json(result.code, { error: result.error });
           await queue.refreshThreadName();
           return json(200, queue.info());
+        }
+        if (pathname.startsWith('/api/component-')) {
+          const review = pathname === '/api/component-plan';
+          const fields = review ? ['ticket'] : ['ticket', 'reviewToken', 'confirmExternal', 'confirmPaused'];
+          if (!payload || Array.isArray(payload) || typeof payload.ticket !== 'string' || Object.keys(payload).some((key) => !fields.includes(key)) || (!review && (typeof payload.reviewToken !== 'string' || !/^[a-f\d]{64}$/.test(payload.reviewToken))) || ['confirmExternal', 'confirmPaused'].some((key) => Object.hasOwn(payload, key) && typeof payload[key] !== 'boolean')) return json(400, { error: 'Expected a ticket identifier and only the documented review/confirmation fields.' });
+          const result = review ? await queue.reviewComponent(payload.ticket) : pathname === '/api/component-message' ? await queue.copyComponent(payload.ticket, payload) : await queue.enqueueComponent(payload.ticket, payload);
+          return json(result.code, result);
         }
         if (!payload || Object.keys(payload).length !== 1 || typeof payload.ticket !== 'string') return json(400, { error: 'Only a ticket identifier is accepted.' });
         const result = pathname === '/api/queue' ? await queue.enqueue(payload.ticket) : await queue.copyMessage(payload.ticket);

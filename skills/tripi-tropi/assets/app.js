@@ -1,4 +1,5 @@
 /* All file content is data. Only sanitized Markdown is inserted as HTML. */
+import { projectGraph, graphComponent, reconcileGraph } from './graph.mjs';
 const el = (id) => document.getElementById(id);
 const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 let snapshot = { features: [], tickets: [], diagnostics: [] };
@@ -10,6 +11,14 @@ const selectedLabels = new Set();
 const filterStates = ['', 'Pending', 'Ready to implement', 'In progress', 'Blocked', 'Completed', 'Discarded', 'Unknown'];
 let workspaceKey;
 let mobileView = 'list';
+let ticketView = 'list';
+let graphWorkspaces = Object.create(null);
+let currentGraph;
+let graphGesture = null;
+let suppressGraphClick = false;
+let componentReview = null;
+let componentGeneration = 0;
+let componentBusy = false;
 let layout = { sidebar: 220, split: 50 };
 let sidebarCollapsed = false;
 let storageTimer;
@@ -40,7 +49,7 @@ function savedWorkspace() {
 }
 function persistWorkspace() {
   if (!workspaceKey) return;
-  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, layout, sidebarCollapsed, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
+  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, ticketView, graphs: graphWorkspaces, layout, sidebarCollapsed, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
 }
 function readRoute() {
   const params = new URLSearchParams(location.search);
@@ -48,6 +57,7 @@ function readRoute() {
   selectedState = params.get('state') ?? '';
   selectedLabels.clear(); for (const label of params.getAll('label')) selectedLabels.add(label);
   mobileView = params.get('view') === 'detail' ? 'detail' : 'list';
+  ticketView = params.get('tickets') === 'graph' ? 'graph' : 'list';
 }
 function writeRoute(method = 'replace') {
   const params = new URLSearchParams();
@@ -56,6 +66,7 @@ function writeRoute(method = 'replace') {
   if (selectedState) params.set('state', selectedState);
   for (const label of selectedLabels) params.append('label', label);
   if (mobileView === 'detail') params.set('view', 'detail');
+  if (ticketView === 'graph') params.set('tickets', 'graph');
   history[`${method}State`]({ scroll: scrollPositions() }, '', `${location.pathname}${params.size ? `?${params}` : ''}`);
   persistWorkspace();
 }
@@ -87,6 +98,9 @@ function applyMobileView() {
 function initializeWorkspace() {
   workspaceKey = `tripi-tropi:${snapshot.repo}`;
   const saved = savedWorkspace();
+  if (saved.graphs && typeof saved.graphs === 'object' && !Array.isArray(saved.graphs)) {
+    for (const [feature, value] of Object.entries(saved.graphs)) if (value && typeof value === 'object' && !Array.isArray(value)) graphWorkspaces[feature] = value;
+  }
   sidebarCollapsed = saved.sidebarCollapsed === true;
   if (Number.isFinite(saved.layout?.sidebar) && Number.isFinite(saved.layout?.split)) layout = saved.layout;
   if (location.search) readRoute();
@@ -96,6 +110,7 @@ function initializeWorkspace() {
     selectedState = typeof saved.state === 'string' ? saved.state : '';
     selectedLabels.clear(); for (const label of Array.isArray(saved.labels) ? saved.labels : []) if (typeof label === 'string') selectedLabels.add(label);
     mobileView = saved.mobileView === 'detail' ? 'detail' : 'list';
+    ticketView = (graphWorkspaces[selectedFeature]?.mode ?? saved.ticketView) === 'graph' ? 'graph' : 'list';
   }
   if (!filterStates.includes(selectedState)) selectedState = '';
   applyLayout(); return saved;
@@ -359,6 +374,209 @@ el('exit-viewer').addEventListener('click', async () => {
   }
 });
 
+function renderGraph() {
+  const graph = projectGraph(snapshot.tickets, selectedFeature);
+  graphGesture = null;
+  const state = reconcileGraph(graph, graphWorkspaces[selectedFeature]);
+  graphWorkspaces[selectedFeature] = state;
+  if (state.isolated && selectedTicket) state.isolated = selectedTicket;
+  const members = state.isolated ? graphComponent(graph, state.isolated) : null;
+  for (const node of graph.nodes) Object.assign(node, state.positions[node.ticket.id]);
+  currentGraph = graph;
+  if (!graph.nodes.length) {
+    el('ticket-graph').innerHTML = `<div class="empty-state"><h3>${selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>Tickets will appear here when they are created.</p></div>`;
+    return;
+  }
+  const byId = new Map(graph.nodes.map((node) => [node.ticket.id, node]));
+  const edges = graph.edges.map((edge) => {
+    const from = byId.get(edge.from); const to = byId.get(edge.to);
+    const dimmed = !matchesFilters(from.ticket) || !matchesFilters(to.ticket);
+    return `<path class="graph-edge ${edge.satisfied ? 'resolved' : ''} ${from.problems.length || to.problems.length ? 'graph-error' : ''} ${dimmed ? 'graph-dimmed' : ''} ${members && (!members.has(edge.from) || !members.has(edge.to)) ? 'graph-outside' : ''}" data-from="${escapeHTML(edge.from)}" data-to="${escapeHTML(edge.to)}" d="${graphEdgePath(from, to)}" marker-end="url(#graph-arrow)"/>`;
+  }).join('');
+  const nodes = graph.nodes.map(({ ticket, primaryLabel, problems, external, x, y }) => {
+    const description = `${String(ticket.number).padStart(2, '0')}: ${ticket.title}. ${ticket.displayState}. Labels: ${ticket.labels.join(', ') || 'None'}.${problems.length ? ` Validation errors: ${problems.join(' ')}` : ''}`;
+    return `<g class="graph-node ${stateClass(ticket.displayState)} ${matchesFilters(ticket) ? '' : 'graph-dimmed'} ${members && !members.has(ticket.id) ? 'graph-outside' : ''}" data-ticket="${escapeHTML(ticket.id)}" transform="translate(${x} ${y})" role="button" tabindex="0" aria-label="${escapeHTML(description)}" aria-pressed="${ticket.id === selectedTicket}">
+      <title>${escapeHTML(description)}</title>
+      <circle class="graph-selection" r="35"/>
+      <circle class="graph-fill" r="28"/>
+      <circle class="graph-border ${primaryLabel ? labelClass(primaryLabel) : 'graph-neutral'}" r="28"/>
+      <text class="graph-number" text-anchor="middle" dy=".35em">${String(ticket.number).padStart(2, '0')}</text>
+      ${external ? '<path class="graph-external" d="M -45 -7 L -33 0 L -45 7 Z"><title>External dependency. See ticket details.</title></path>' : ''}
+      ${problems.length ? '<g class="graph-warning" aria-hidden="true"><circle cx="23" cy="-23" r="9"/><text x="23" y="-20" text-anchor="middle">!</text></g>' : ''}
+    </g>`;
+  }).join('');
+  el('ticket-graph').innerHTML = `<div class="graph-tools" role="group" aria-label="Graph controls"><button type="button" class="refresh" data-graph-action="zoom-in" aria-label="Zoom in">+</button><button type="button" class="refresh" data-graph-action="zoom-out" aria-label="Zoom out">−</button><output id="graph-zoom" aria-label="Graph zoom"></output><button type="button" class="refresh" data-graph-action="fit">Fit graph</button><button type="button" class="refresh" data-graph-action="rearrange">Rearrange</button><button type="button" class="refresh" data-graph-action="isolate" ${!selectedTicket && !state.isolated ? 'disabled' : ''}>Isolate dependencies</button><button type="button" class="refresh" data-graph-action="review" ${!state.isolated || !queueInfo.token || componentBusy ? 'disabled' : ''}>Review dependencies</button></div><svg class="graph-canvas" role="group" aria-label="Ticket dependency graph"><defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/></marker></defs>${edges}${nodes}</svg><p class="graph-tooltip" id="graph-tooltip" role="tooltip" hidden></p>`;
+  el('ticket-graph').querySelector('[data-graph-action="isolate"]').setAttribute('aria-pressed', String(Boolean(state.isolated)));
+  const componentStatus = document.createElement('p');
+  componentStatus.className = 'graph-component'; componentStatus.setAttribute('role', 'status');
+  componentStatus.textContent = members ? `Dependencies for ${String(byId.get(state.isolated).ticket.number).padStart(2, '0')} (${members.size} ${members.size === 1 ? 'ticket' : 'tickets'}): ${graph.nodes.filter((node) => members.has(node.ticket.id)).map((node) => String(node.ticket.number).padStart(2, '0')).join(', ')}` : 'All tickets';
+  el('ticket-graph').querySelector('.graph-tools').after(componentStatus);
+  updateGraphGeometry();
+}
+
+function graphEdgePath(from, to) {
+  const x1 = from.x + 29; const x2 = to.x - 35;
+  const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${from.y} C ${x1 + bend} ${from.y}, ${x2 - bend} ${to.y}, ${x2} ${to.y}`;
+}
+function updateGraphGeometry() {
+  const state = graphWorkspaces[selectedFeature]; const svg = el('ticket-graph').querySelector('svg');
+  if (!svg || !currentGraph) return;
+  const byId = new Map(currentGraph.nodes.map((node) => { Object.assign(node, state.positions[node.ticket.id]); return [node.ticket.id, node]; }));
+  for (const node of svg.querySelectorAll('[data-ticket]')) {
+    const point = byId.get(node.dataset.ticket); node.setAttribute('transform', `translate(${point.x} ${point.y})`);
+  }
+  for (const edge of svg.querySelectorAll('[data-from]')) edge.setAttribute('d', graphEdgePath(byId.get(edge.dataset.from), byId.get(edge.dataset.to)));
+  svg.setAttribute('viewBox', `${state.view.x} ${state.view.y} ${state.width / state.view.zoom} ${state.height / state.view.zoom}`);
+  el('graph-zoom').textContent = `${Math.round(state.view.zoom * 100)}%`;
+}
+function fitGraph() {
+  const state = graphWorkspaces[selectedFeature];
+  if (!currentGraph?.nodes.length) return;
+  const xs = currentGraph.nodes.map((node) => node.x); const ys = currentGraph.nodes.map((node) => node.y);
+  const left = Math.min(...xs) - 60; const top = Math.min(...ys) - 60;
+  const width = Math.max(...xs) - left + 60; const height = Math.max(...ys) - top + 60;
+  const zoom = clamp(Math.min(state.width / width, state.height / height), .25, 4);
+  state.view = { zoom, x: left + width / 2 - state.width / zoom / 2, y: top + height / 2 - state.height / zoom / 2 };
+  updateGraphGeometry(); persistWorkspace();
+}
+function zoomGraph(factor, point) {
+  const state = graphWorkspaces[selectedFeature]; const old = state.view.zoom;
+  const anchor = point ?? { x: state.view.x + state.width / old / 2, y: state.view.y + state.height / old / 2 };
+  state.view.zoom = clamp(old * factor, .25, 4);
+  state.view.x = clamp(anchor.x - (anchor.x - state.view.x) * old / state.view.zoom, -state.width * 4, state.width * 4);
+  state.view.y = clamp(anchor.y - (anchor.y - state.view.y) * old / state.view.zoom, -state.height * 4, state.height * 4);
+  updateGraphGeometry(); persistWorkspace();
+}
+
+function componentContext(root) {
+  const graph = projectGraph(snapshot.tickets, selectedFeature);
+  const ids = graphComponent(graph, root);
+  const byId = new Map(snapshot.tickets.map((ticket) => [ticket.id, ticket]));
+  for (const id of ids) for (const dependency of byId.get(id)?.dependencies ?? []) if (dependency.id) ids.add(dependency.id);
+  return JSON.stringify({ feature: selectedFeature, isolated: graphWorkspaces[selectedFeature]?.isolated, view: ticketView, state: selectedState, labels: [...selectedLabels].sort(), thread: queueInfo.thread,
+    files: [...ids].sort().map((id) => [id, byId.get(id)?.content]), triage: snapshot.triageRoles });
+}
+function closeComponentReview() {
+  componentGeneration++; componentReview = null;
+  componentPointerStartedOutside = false;
+  el('component-dialog').close();
+  (el('ticket-graph').querySelector('[data-graph-action="review"]:enabled') ?? el('ticket-graph').querySelector('[data-graph-action="fit"]'))?.focus();
+}
+async function componentRequest(route, payload) {
+  const response = await fetch(`/api/component-${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Queue-Token': queueInfo.token }, body: JSON.stringify(payload) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? 'Could not process these dependencies.');
+  return result;
+}
+function componentButtons() {
+  if (!componentReview) return;
+  const review = componentReview; const data = review.data;
+  const conflicts = data?.conflicts.length && !data.requiresPausedConfirmation;
+  const disabled = componentBusy || !data || review.invalid || review.delivered || review.deliveryFailed || conflicts || (data.plan.warnings.length && !review.confirmExternal) || (data.requiresPausedConfirmation && !review.confirmPaused);
+  const queue = el('component-dialog').querySelector('[data-component-action="queue"]');
+  const copy = el('component-dialog').querySelector('[data-component-action="copy"]');
+  if (queue) queue.disabled = Boolean(disabled || !queueInfo.thread);
+  if (copy) copy.disabled = Boolean(disabled);
+}
+function renderComponentReview() {
+  if (!componentReview) return;
+  const focused = el('component-dialog').contains(document.activeElement) ? document.activeElement.dataset.componentAction : null;
+  const review = componentReview; const data = review.data;
+  const ticketLink = (id, title) => `<button type="button" class="component-ticket" data-component-ticket="${escapeHTML(id)}">${escapeHTML(title)}</button>`;
+  const context = data ? `<p>Includes the selected ticket and all its local prerequisites. Filters do not exclude tickets from this set.</p><h3>Implementation order</h3><ol class="component-order">${data.plan.order.map((ticket) => `<li>${ticketLink(ticket.id, `${String(ticket.number).padStart(2, '0')}: ${ticket.title}`)}</li>`).join('')}</ol><h3>Already completed</h3><ul>${data.plan.completed.length ? data.plan.completed.map((id) => `<li>${ticketLink(id, data.plan.component.find((ticket) => ticket.id === id)?.title ?? id)}</li>`).join('') : '<li>None</li>'}</ul>` : '';
+  const external = data?.plan.warnings.length ? `<section class="component-warning"><p>This ticket has an external dependency. The implementation flow will pause before completing the full set. Continue?</p><ul>${data.plan.warnings.map((warning) => `<li>${ticketLink(warning.ticket, warning.ticket)} depends on ${ticketLink(warning.dependency, `${warning.feature}:${String(warning.number).padStart(2, '0')} — ${warning.title}`)}</li>`).join('')}</ul><label><input type="checkbox" data-component-confirm="confirmExternal" ${review.confirmExternal ? 'checked' : ''} ${componentBusy || review.invalid || review.delivered ? 'disabled' : ''}> I understand that the flow will pause if this dependency is still unfinished.</label></section>` : '';
+  const pause = data?.requiresPausedConfirmation ? `<label class="component-warning"><input type="checkbox" data-component-confirm="confirmPaused" ${review.confirmPaused ? 'checked' : ''} ${componentBusy || review.invalid || review.delivered ? 'disabled' : ''}> I checked the agent CLI: the earlier flow is paused and will not resume these tickets.</label>` : '';
+  const conflict = data?.conflicts.length && !data.requiresPausedConfirmation ? '<p class="error-text">Some tickets already have a delivery attempt. Check the linked session; no automatic retry will be sent.</p>' : '';
+  el('component-dialog').innerHTML = `<h2 id="component-title" tabindex="-1">Review dependencies</h2>${context}${external}${pause}${conflict}${review.error ? `<p role="alert" class="error-text">${escapeHTML(review.error)}</p>` : ''}<p id="component-status" role="status">${escapeHTML(review.status ?? '')}</p><div class="component-actions"><button type="button" class="refresh" data-component-action="close">${componentBusy || review.delivered ? 'Close' : 'Cancel'}</button><button type="button" class="refresh" data-component-action="copy">${review.copied ? 'Copied' : 'Copy implementation message'}</button><button type="button" class="refresh" data-component-action="queue">${review.delivered ? 'Queued' : componentBusy && review.sending ? 'Sending' : data?.requiresPausedConfirmation ? 'Queue remaining tickets' : 'Queue dependencies'}</button></div>`;
+  componentButtons();
+  if (focused && el('component-dialog').open) {
+    const target = el('component-dialog').querySelector(`[data-component-action="${focused}"]:enabled`) ?? el('component-status');
+    target.tabIndex = target.id === 'component-status' ? -1 : 0; target.focus();
+  }
+}
+function invalidateComponentContext() {
+  if (!componentReview || componentReview.invalid || componentReview.context === componentContext(componentReview.root)) return;
+  componentReview.invalid = true; componentReview.confirmExternal = false; componentReview.confirmPaused = false;
+  componentReview.error = 'The plan or workspace changed. Close this dialog and review the dependencies again before continuing.';
+  renderComponentReview();
+  if (!componentBusy && el('component-dialog').open) el('component-dialog').querySelector('[data-component-action="close"]')?.focus();
+}
+async function openComponentReview() {
+  const root = graphWorkspaces[selectedFeature]?.isolated;
+  if (!root || componentBusy) return;
+  const generation = ++componentGeneration;
+  componentReview = { root, context: componentContext(root), data: null, status: 'Reviewing current tickets…' };
+  renderComponentReview();
+  if (!el('component-dialog').open) el('component-dialog').showModal();
+  el('component-title').focus();
+  try {
+    const data = await componentRequest('plan', { ticket: root });
+    if (generation !== componentGeneration) return;
+    invalidateComponentContext();
+    if (componentReview.invalid) return;
+    componentReview.data = data; componentReview.status = 'Review the order and required confirmations before continuing.';
+  } catch (error) {
+    if (generation !== componentGeneration) return;
+    componentReview.error = error.message; componentReview.status = 'This dependency set cannot be scheduled in its current state.';
+  }
+  if (generation === componentGeneration) { renderComponentReview(); el('component-title').focus(); }
+}
+async function submitComponent(action) {
+  const review = componentReview;
+  if (!review || componentBusy) return;
+  invalidateComponentContext(); componentButtons();
+  if (el('component-dialog').querySelector(`[data-component-action="${action}"]`)?.disabled) return;
+  const generation = componentGeneration;
+  componentBusy = true; review.sending = action === 'queue'; review.error = '';
+  review.status = action === 'queue' ? 'Sending one instruction to Codex. Closing this dialog does not cancel delivery.' : 'Preparing the current implementation message…';
+  renderComponentReview(); render();
+  try {
+    const result = await componentRequest(action === 'queue' ? 'queue' : 'message', { ticket: review.root, reviewToken: review.data.reviewToken, confirmExternal: review.confirmExternal === true, confirmPaused: review.confirmPaused === true });
+    if (action === 'queue') {
+      review.delivered = true; review.status = 'Queued. Delivery only; follow implementation through the live ticket states.';
+    } else if (generation === componentGeneration && review.context === componentContext(review.root)) {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable in this browser context.');
+      await navigator.clipboard.writeText(result.message);
+      review.copied = true; review.status = 'Implementation message copied. Paste it manually into the agent CLI; nothing was queued.';
+    } else { review.invalid = true; review.error = 'The plan changed. Close this dialog and review the dependencies again before copying.'; }
+  } catch (error) {
+    review.error = `${error.message}${action === 'queue' ? ' No retry was sent. Check the linked session before any new send.' : ''}`;
+    review.invalid = true; review.confirmExternal = false; review.confirmPaused = false;
+    review.deliveryFailed = action === 'queue';
+    if (generation !== componentGeneration && action === 'queue') { el('error').textContent = review.error; el('error').hidden = false; }
+  } finally {
+    componentBusy = false;
+    if (action === 'queue') await loadQueue();
+    render();
+    if (generation === componentGeneration) renderComponentReview();
+  }
+}
+let componentPointerStartedOutside = false;
+function outsideComponentDialog(event) {
+  const box = el('component-dialog').getBoundingClientRect();
+  return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+}
+el('component-dialog').addEventListener('pointerdown', (event) => {
+  componentPointerStartedOutside = event.button === 0 && outsideComponentDialog(event);
+});
+el('component-dialog').addEventListener('pointercancel', () => { componentPointerStartedOutside = false; });
+el('component-dialog').addEventListener('cancel', (event) => { event.preventDefault(); closeComponentReview(); });
+el('component-dialog').addEventListener('click', (event) => {
+  const dismiss = componentPointerStartedOutside && outsideComponentDialog(event);
+  componentPointerStartedOutside = false;
+  if (dismiss) { closeComponentReview(); return; }
+  const ticket = event.target.closest('[data-component-ticket]');
+  if (ticket) { const id = ticket.dataset.componentTicket; closeComponentReview(); navigateTicket(id); return; }
+  const action = event.target.closest('[data-component-action]')?.dataset.componentAction;
+  if (action === 'close') closeComponentReview();
+  if (action === 'copy' || action === 'queue') submitComponent(action);
+});
+el('component-dialog').addEventListener('change', (event) => {
+  const key = event.target.dataset.componentConfirm;
+  if (componentReview && ['confirmExternal', 'confirmPaused'].includes(key)) { componentReview[key] = event.target.checked; componentButtons(); }
+});
+
 function render() {
   const scroll = scrollPositions();
   const openDiagnostics = el('detail').querySelector('.diagnostics')?.open;
@@ -376,7 +594,12 @@ function render() {
   const tickets = featureTickets.filter(matchesFilters);
   el('list-title').textContent = selectedFeature ?? 'Tickets';
   el('ticket-count').textContent = selectedFeature ? '' : tickets.length;
+  if (selectedFeature) (graphWorkspaces[selectedFeature] ??= {}).mode = ticketView;
   el('ticket-list').innerHTML = tickets.length ? `<table><thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead><tbody>${tickets.map((ticket) => `<tr data-ticket-row="${escapeHTML(ticket.id)}" class="${ticket.id === selectedTicket ? 'selected' : ''}"><td class="ticket-number">${String(ticket.number ?? '?').padStart(2, '0')}</td><td><button class="ticket-link" data-ticket="${escapeHTML(ticket.id)}">${escapeHTML(ticket.title || ticket.filename)}</button><div class="row-labels">${ticket.labels.map(labelChip).join('')}</div>${ticket.commits.length ? `<div class="row-commits">${commitChips(ticket)}</div>` : ''}</td><td>${stateChip(ticket.displayState)}${ticket.displayState === 'In progress' ? completionChip(ticket.progress.total ? Math.round(ticket.progress.checked / ticket.progress.total * 100) : 0) : ''}</td><td><span class="ticket-summary" title="${escapeHTML(summary(ticket))}">${escapeHTML(summary(ticket))}</span></td></tr>`).join('')}</tbody></table>` : `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${featureTickets.length ? 'No tickets match these filters' : selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>${featureTickets.length ? 'Change the selected labels or status, or clear the filters.' : selectedFeature ? 'Tickets will appear here when they are created.' : 'Create a feature and its tickets with to-tickets, then select Refresh.'}</p></div>`;
+  el('ticket-list').hidden = ticketView === 'graph';
+  el('ticket-graph').hidden = ticketView !== 'graph';
+  for (const button of document.querySelectorAll('[data-ticket-view]')) button.setAttribute('aria-pressed', String(button.dataset.ticketView === ticketView));
+  if (ticketView === 'graph') renderGraph();
   const ticket = snapshot.tickets.find((item) => item.id === selectedTicket);
   const feature = snapshot.features.find((item) => item.name === selectedFeature);
   if (ticket) {
@@ -396,6 +619,7 @@ function render() {
   }
   if (openDiagnostics !== undefined && el('detail').querySelector('.diagnostics')) el('detail').querySelector('.diagnostics').open = openDiagnostics;
   restoreScroll(scroll); applyMobileView();
+  invalidateComponentContext();
 }
 
 function applySnapshot(data) {
@@ -408,7 +632,10 @@ function applySnapshot(data) {
   normalizeSelection();
   el('error').hidden = true; renderFilters(); render();
   if (first && saved?.scroll && saved.ticket === selectedTicket && saved.feature === selectedFeature) restoreScroll(saved.scroll);
-  if (focusKey) document.querySelector(`[${focusKey[0]}="${CSS.escape(focusKey[1])}"]`)?.focus({ preventScroll: true });
+  if (focusKey) {
+    const scope = focusKey[0] === 'data-ticket' && ticketView === 'graph' ? el('ticket-graph') : document;
+    scope.querySelector(`[${focusKey[0]}="${CSS.escape(focusKey[1])}"]`)?.focus({ preventScroll: true });
+  }
   writeRoute();
 }
 
@@ -450,7 +677,7 @@ async function refresh() {
 el('features').addEventListener('click', (event) => {
   const button = event.target.closest('[data-feature]');
   if (!button) return;
-  recordCurrentScroll(); selectedFeature = button.dataset.feature; selectedTicket = null; mobileView = 'detail'; render(); el('detail').scrollTop = 0; writeRoute('push');
+  recordCurrentScroll(); selectedFeature = button.dataset.feature; selectedTicket = null; mobileView = 'detail'; ticketView = graphWorkspaces[selectedFeature]?.mode ?? ticketView; render(); el('detail').scrollTop = 0; writeRoute('push');
 });
 el('ticket-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-ticket]');
@@ -459,6 +686,76 @@ el('ticket-list').addEventListener('click', (event) => {
   if (!ticketButton) return;
   navigateTicket(ticketButton.dataset.ticket);
 });
+document.querySelector('.view-switch').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-ticket-view]');
+  if (!button) return;
+  recordCurrentScroll(); ticketView = button.dataset.ticketView; render(); writeRoute('push');
+});
+function activateGraphNode(event) {
+  if (event.type === 'click' && suppressGraphClick) { suppressGraphClick = false; return; }
+  const action = event.target.closest('[data-graph-action]')?.dataset.graphAction;
+  if (action && event.type === 'click') {
+    const state = graphWorkspaces[selectedFeature];
+    if (action === 'zoom-in' || action === 'zoom-out') zoomGraph(action === 'zoom-in' ? 1.25 : .8);
+    if (action === 'fit') fitGraph();
+    if (action === 'review') { openComponentReview(); return; }
+    if (action === 'rearrange') { state.positions = {}; state.view = {}; renderGraph(); fitGraph(); }
+    if (action === 'isolate') {
+      recordCurrentScroll();
+      state.isolated = state.isolated ? null : selectedTicket;
+      if (state.isolated) { selectedLabels.clear(); selectedState = ''; renderFilters(); }
+      render(); fitGraph(); writeRoute('push');
+    }
+    if (['rearrange', 'isolate'].includes(action)) el('ticket-graph').querySelector(`[data-graph-action="${action}"]`)?.focus();
+    persistWorkspace(); return;
+  }
+  const node = event.target.closest('[data-ticket]');
+  if (node && event.type === 'keydown' && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+    event.preventDefault(); const state = graphWorkspaces[selectedFeature]; const point = state.positions[node.dataset.ticket];
+    point.x = clamp(point.x + (event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0), state.bounds.left, state.bounds.right);
+    point.y = clamp(point.y + (event.key === 'ArrowUp' ? -16 : event.key === 'ArrowDown' ? 16 : 0), state.bounds.top, state.bounds.bottom);
+    updateGraphGeometry(); persistWorkspace(); return;
+  }
+  if (!node || (event.type === 'keydown' && !['Enter', ' '].includes(event.key))) return;
+  event.preventDefault(); navigateTicket(node.dataset.ticket);
+  el('ticket-graph').querySelector(`[data-ticket="${CSS.escape(node.dataset.ticket)}"]`)?.focus({ preventScroll: true });
+}
+el('ticket-graph').addEventListener('click', activateGraphNode);
+el('ticket-graph').addEventListener('keydown', activateGraphNode);
+el('ticket-graph').addEventListener('pointerdown', (event) => {
+  const svg = event.target.closest('.graph-canvas');
+  if (!svg || event.button !== 0) return;
+  suppressGraphClick = false;
+  const id = event.target.closest('[data-ticket]')?.dataset.ticket;
+  const state = graphWorkspaces[selectedFeature]; const inverse = svg.getScreenCTM().inverse();
+  graphGesture = { id, inverse, start: new DOMPoint(event.clientX, event.clientY).matrixTransform(inverse), origin: { ...(id ? state.positions[id] : state.view) }, clientX: event.clientX, clientY: event.clientY, moved: false };
+  (event.target.closest('[data-ticket]') ?? svg).setPointerCapture(event.pointerId);
+});
+el('ticket-graph').addEventListener('pointermove', (event) => {
+  if (!graphGesture) return;
+  const gesture = graphGesture; const state = graphWorkspaces[selectedFeature];
+  if (Math.hypot(event.clientX - gesture.clientX, event.clientY - gesture.clientY) < 4 && !gesture.moved) return;
+  gesture.moved = true;
+  const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(gesture.inverse);
+  const dx = point.x - gesture.start.x; const dy = point.y - gesture.start.y;
+  if (gesture.id) state.positions[gesture.id] = { x: clamp(gesture.origin.x + dx, state.bounds.left, state.bounds.right), y: clamp(gesture.origin.y + dy, state.bounds.top, state.bounds.bottom) };
+  else { state.view.x = clamp(gesture.origin.x - dx, -state.width * 4, state.width * 4); state.view.y = clamp(gesture.origin.y - dy, -state.height * 4, state.height * 4); }
+  updateGraphGeometry();
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el('ticket-graph').addEventListener(type, () => {
+  if (!graphGesture) return;
+  suppressGraphClick = graphGesture.moved; graphGesture = null; persistWorkspace();
+});
+el('ticket-graph').addEventListener('wheel', (event) => {
+  const svg = event.target.closest('.graph-canvas'); if (!svg) return;
+  event.preventDefault(); zoomGraph(event.deltaY < 0 ? 1.1 : 1 / 1.1, new DOMPoint(event.clientX, event.clientY).matrixTransform(svg.getScreenCTM().inverse()));
+}, { passive: false });
+for (const type of ['pointerover', 'focusin']) el('ticket-graph').addEventListener(type, (event) => {
+  const node = event.target.closest('[data-ticket]');
+  const tooltip = el('graph-tooltip');
+  if (node && tooltip) { tooltip.textContent = node.getAttribute('aria-label'); tooltip.hidden = false; }
+});
+for (const type of ['pointerleave', 'focusout']) el('ticket-graph').addEventListener(type, () => { if (el('graph-tooltip')) el('graph-tooltip').hidden = true; });
 el('detail').addEventListener('click', (event) => {
   const link = event.target.closest('[data-ticket]');
   if (!link) return;
