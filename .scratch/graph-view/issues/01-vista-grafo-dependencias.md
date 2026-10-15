@@ -1,9 +1,9 @@
 # 01: Mostrar una vista alternativa del grafo de dependencias
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: graph-view, frontend
 Blocked by: none
-Commits: none
+Commits: 8c341048aaee
 Verbosity: 1
 
 ## Estado inicial
@@ -37,4 +37,4 @@ La vista funciona de punta a punta sin necesitar los controles espaciales ni la 
 
 ## Estado posterior
 
-Pendiente.
+Vista List/Graph disponible y verificada; implementación registrada en 8c341048aaee, sin push. El ticket 02 queda desbloqueado.
