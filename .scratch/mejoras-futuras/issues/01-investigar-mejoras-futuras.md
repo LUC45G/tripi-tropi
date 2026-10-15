@@ -1,9 +1,9 @@
 # 01: Investigar y priorizar posibles mejoras futuras
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: research, product, planning
 Blocked by: none
-Commits: none
+Commits: 4ca460daac31
 Verbosity: 1
 
 ## Estado inicial
@@ -23,12 +23,13 @@ La entrega es un único informe de investigación con una priorización utilizab
 - [x] Registrar en `.scratch/mejoras-futuras/research.md` propuestas ordenadas con problema, usuario beneficiado, evidencia o razonamiento, impacto, esfuerzo/riesgo, dependencias y siguiente paso sugerido.
 - [x] Separar hechos observados de hipótesis y señalar cualquier validación con usuarios o experimento que falte.
 - [x] No implementar propuestas, crear tickets adicionales, cambiar la aplicación ni alterar archivos fuera de esta feature.
-- [ ] Validar el ticket y el informe, registrar al menos un commit de documentación con feature y número, y guardar su hash real en un commit de ticket posterior.
+- [x] Validar el ticket y el informe, registrar al menos un commit de documentación con feature y número, y guardar su hash real en un commit de ticket posterior.
 
 ## Trabajo realizado
 
 - Investigación: revisión del estado local, documentación upstream y reportes públicos; propuestas sin implementar y sin crear tickets nuevos.
 - Fuentes: páginas completas y respuestas del mantenedor contrastadas con snippets desactualizados; ocho propuestas con impacto, esfuerzo, riesgos, dependencias y experimento en el informe. Sin encuesta representativa ni métricas reales de facturación.
+- Verificación: ocho propuestas en informe y ticket, enlaces Markdown locales correctos y validación estricta de 27 tickets sin errores ni advertencias; no se repitieron tests de aplicación para esta entrega documental.
 
 ### Oportunidades para revisar
 
@@ -46,4 +47,4 @@ Prioridad provisional de producto, no ranking estadístico de demanda. Los repor
 No se cuentan como oportunidades nuevas: grafo, aislamiento de prerrequisitos, instalación, filtros, actualizaciones en vivo y Clarify ticket ya existen; Split ticket está diseñado en 02; políticas de labels/features corresponden a 03/04; la revisión visual 07 sigue abierta por decisión del usuario. Los detalles de evidencia, impacto, esfuerzo, riesgos y experimentos se registran en [research.md](../research.md).
 
 ## Estado posterior
-Investigación documentada y oportunidades enumeradas en este ticket; pendiente registrar el commit y validar cierre.
+Investigación completada, con ocho oportunidades priorizadas para revisión; propuestas sin implementar ni aprobar automáticamente.

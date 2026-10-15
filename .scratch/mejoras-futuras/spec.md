@@ -12,6 +12,8 @@ La feature documenta oportunidades y criterios para decidir qué explorar despu�
 
 Un informe de investigación con propuestas priorizadas, su problema y valor esperado, evidencia, esfuerzo/riesgos, dependencias y un siguiente paso sugerido.
 
+El informe de 01 está completado en [research.md](research.md), con ocho oportunidades también enumeradas en su ticket. La prioridad es una recomendación pendiente de revisión, no autorización de implementación.
+
 ## Análisis específicos pendientes de revisión
 
 Además del informe general de 01, se registran estas investigaciones independientes, sin dependencias entre sí ni respecto de 01:
