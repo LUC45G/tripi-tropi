@@ -22,5 +22,6 @@ Además del informe general de 01, se registran estas investigaciones independie
 - [03: Política de labels](issues/03-analizar-politica-labels.md): reducir redundancias y decidir cuándo crear una etiqueta nueva.
 - [04: Criterios para features](issues/04-analizar-criterios-features.md): decidir cuándo crear una feature, reutilizar una existente o tratar un cambio puntual.
 - [05: Solicitar aclaraciones](issues/05-solicitar-aclaracion-desde-ticket.md): implementación completada de `Clarify ticket`, con nota, previsualización, copia, cola y liberación manual; `Split ticket` permanece sin implementar.
+- [06: Mensajes compactos](issues/06-compactar-mensajes-agente.md): instrucciones de aclaración e implementación individual/por conjunto convertidas en reglas concretas, con medición de tamaño y contratos verificados.
 
 El análisis de 02 está completado y confirmado en [acciones-tickets.md](acciones-tickets.md); la implementación de sus controles queda fuera de este trabajo. 03 y 04 permanecen en `needs-triage` y `pending`: registrarlos no aprueba sus propuestas ni autoriza implementación. Cada uno entrega su propio análisis para revisión, sin modificar políticas o migrar tickets.
