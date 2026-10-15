@@ -50,6 +50,8 @@ The launcher opens the browser and returns immediately. Add `--no-open` to print
 
 An exact session name must identify one entry in the local Codex index; the viewer stores its UUID as the destination. Existing send records under that name are retained for duplicate protection. Queue and copy actions require a structurally valid ticket with `Execution: pending`, agent approval, and completed valid dependencies. Legacy Markdown remains browsable; fix validation errors before requesting implementation. Feature-filtered discovery and validation resolve dependencies across the entire repository before filtering results.
 
+Use **List / Graph** to switch the central panel between the ticket table and a dependency graph of the selected feature. Arrows follow the work flow from blocker to dependent. External dependencies appear as arrowheads only; select a ticket to inspect their details. Node borders use the first explicit label color and fills use the ticket state. Filters dim nonmatching nodes while keeping dependency context visible. Hover or focus a node for its name, then click or press Enter/Space to open the original Markdown detail. The graph updates automatically as local files change. Dragging, pan/zoom, component isolation and batch implementation are planned separately.
+
 To check whether a viewer is already active for a repository, run the launcher again with the same repository and `--no-open`:
 
 ```sh

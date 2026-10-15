@@ -9,7 +9,7 @@
   <script src="/vendor/marked.js" defer></script>
   <script src="/vendor/purify.js" defer></script>
   <script src="/vendor/gsap.js" defer></script>
-  <script src="/app.js" defer></script>
+  <script src="/app.js" type="module"></script>
 </head>
 <body>
   <header class="topbar">
@@ -34,13 +34,14 @@
     </aside>
     <div class="splitter" id="sidebar-splitter" role="separator" aria-label="Resize feature sidebar" aria-orientation="vertical" tabindex="0" aria-valuemin="160" aria-valuemax="400" aria-valuenow="220"></div>
     <section class="tickets-pane" aria-label="Tickets">
-      <div class="panel-heading"><div><h2 id="list-title">Tickets</h2></div><span id="ticket-count" class="count">0</span></div>
+      <div class="panel-heading"><div><h2 id="list-title">Tickets</h2></div><div class="view-switch" role="group" aria-label="Ticket view"><button type="button" data-ticket-view="list" aria-pressed="true">List</button><button type="button" data-ticket-view="graph" aria-pressed="false">Graph</button></div><span id="ticket-count" class="count">0</span></div>
       <div class="filters" aria-label="Ticket filters">
         <div class="filter-field"><span id="status-title" class="filter-title">Status</span><details class="filter-dropdown" id="status-filter"><summary id="status-summary" aria-describedby="status-title">All states</summary><div id="state-options" class="filter-options" aria-label="Choose status"></div></details><input id="state-filter" type="hidden" value=""></div>
         <div class="filter-field"><span id="labels-title" class="filter-title">Labels</span><details class="filter-dropdown" id="label-filter"><summary id="label-summary" aria-describedby="labels-title">All labels</summary><div id="label-options" class="filter-options" aria-label="Choose labels"></div></details></div>
         <button id="clear-filters" class="clear-filters" type="button" disabled>Clear filters</button>
       </div>
       <div id="ticket-list" class="table-scroll"><p class="empty">Loading local tickets…</p></div>
+      <div id="ticket-graph" class="ticket-graph" hidden></div>
     </section>
     <div class="splitter" id="detail-splitter" role="separator" aria-label="Resize ticket and detail panels" aria-orientation="vertical" tabindex="0" aria-valuemin="25" aria-valuemax="75" aria-valuenow="50"></div>
     <section class="detail-pane" aria-label="Selected detail" tabindex="-1">

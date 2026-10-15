@@ -1,4 +1,5 @@
 /* All file content is data. Only sanitized Markdown is inserted as HTML. */
+import { projectGraph } from './graph.mjs';
 const el = (id) => document.getElementById(id);
 const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 let snapshot = { features: [], tickets: [], diagnostics: [] };
@@ -10,6 +11,7 @@ const selectedLabels = new Set();
 const filterStates = ['', 'Pending', 'Ready to implement', 'In progress', 'Blocked', 'Completed', 'Discarded', 'Unknown'];
 let workspaceKey;
 let mobileView = 'list';
+let ticketView = 'list';
 let layout = { sidebar: 220, split: 50 };
 let sidebarCollapsed = false;
 let storageTimer;
@@ -48,6 +50,7 @@ function readRoute() {
   selectedState = params.get('state') ?? '';
   selectedLabels.clear(); for (const label of params.getAll('label')) selectedLabels.add(label);
   mobileView = params.get('view') === 'detail' ? 'detail' : 'list';
+  ticketView = params.get('tickets') === 'graph' ? 'graph' : 'list';
 }
 function writeRoute(method = 'replace') {
   const params = new URLSearchParams();
@@ -56,6 +59,7 @@ function writeRoute(method = 'replace') {
   if (selectedState) params.set('state', selectedState);
   for (const label of selectedLabels) params.append('label', label);
   if (mobileView === 'detail') params.set('view', 'detail');
+  if (ticketView === 'graph') params.set('tickets', 'graph');
   history[`${method}State`]({ scroll: scrollPositions() }, '', `${location.pathname}${params.size ? `?${params}` : ''}`);
   persistWorkspace();
 }
@@ -359,6 +363,35 @@ el('exit-viewer').addEventListener('click', async () => {
   }
 });
 
+function renderGraph() {
+  const graph = projectGraph(snapshot.tickets, selectedFeature);
+  if (!graph.nodes.length) {
+    el('ticket-graph').innerHTML = `<div class="empty-state"><h3>${selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>Tickets will appear here when they are created.</p></div>`;
+    return;
+  }
+  const byId = new Map(graph.nodes.map((node) => [node.ticket.id, node]));
+  const edges = graph.edges.map((edge) => {
+    const from = byId.get(edge.from); const to = byId.get(edge.to);
+    const x1 = from.x + 29; const x2 = to.x - 35;
+    const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+    const dimmed = !matchesFilters(from.ticket) || !matchesFilters(to.ticket);
+    return `<path class="graph-edge ${edge.satisfied ? 'resolved' : ''} ${from.problems.length || to.problems.length ? 'graph-error' : ''} ${dimmed ? 'graph-dimmed' : ''}" data-from="${escapeHTML(edge.from)}" data-to="${escapeHTML(edge.to)}" d="M ${x1} ${from.y} C ${x1 + bend} ${from.y}, ${x2 - bend} ${to.y}, ${x2} ${to.y}" marker-end="url(#graph-arrow)"/>`;
+  }).join('');
+  const nodes = graph.nodes.map(({ ticket, primaryLabel, problems, external, x, y }) => {
+    const description = `${String(ticket.number).padStart(2, '0')}: ${ticket.title}. ${ticket.displayState}. Labels: ${ticket.labels.join(', ') || 'None'}.${problems.length ? ` Validation errors: ${problems.join(' ')}` : ''}`;
+    return `<g class="graph-node ${stateClass(ticket.displayState)} ${matchesFilters(ticket) ? '' : 'graph-dimmed'}" data-ticket="${escapeHTML(ticket.id)}" transform="translate(${x} ${y})" role="button" tabindex="0" aria-label="${escapeHTML(description)}" aria-pressed="${ticket.id === selectedTicket}">
+      <title>${escapeHTML(description)}</title>
+      <circle class="graph-selection" r="35"/>
+      <circle class="graph-fill" r="28"/>
+      <circle class="graph-border ${primaryLabel ? labelClass(primaryLabel) : 'graph-neutral'}" r="28"/>
+      <text class="graph-number" text-anchor="middle" dy=".35em">${String(ticket.number).padStart(2, '0')}</text>
+      ${external ? '<path class="graph-external" d="M -45 -7 L -33 0 L -45 7 Z"><title>External dependency. See ticket details.</title></path>' : ''}
+      ${problems.length ? '<g class="graph-warning" aria-hidden="true"><circle cx="23" cy="-23" r="9"/><text x="23" y="-20" text-anchor="middle">!</text></g>' : ''}
+    </g>`;
+  }).join('');
+  el('ticket-graph').innerHTML = `<p class="graph-legend" id="graph-legend">Blocker → dependent. Arrowhead only: external dependency. Border: label. Fill: state. !: validation error.</p><svg class="graph-canvas" viewBox="0 0 ${graph.width} ${graph.height}" role="group" aria-label="Ticket dependency graph" aria-describedby="graph-legend"><defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/></marker></defs>${edges}${nodes}</svg><p class="graph-tooltip" id="graph-tooltip" role="tooltip" hidden></p>`;
+}
+
 function render() {
   const scroll = scrollPositions();
   const openDiagnostics = el('detail').querySelector('.diagnostics')?.open;
@@ -377,6 +410,10 @@ function render() {
   el('list-title').textContent = selectedFeature ?? 'Tickets';
   el('ticket-count').textContent = selectedFeature ? '' : tickets.length;
   el('ticket-list').innerHTML = tickets.length ? `<table><thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead><tbody>${tickets.map((ticket) => `<tr data-ticket-row="${escapeHTML(ticket.id)}" class="${ticket.id === selectedTicket ? 'selected' : ''}"><td class="ticket-number">${String(ticket.number ?? '?').padStart(2, '0')}</td><td><button class="ticket-link" data-ticket="${escapeHTML(ticket.id)}">${escapeHTML(ticket.title || ticket.filename)}</button><div class="row-labels">${ticket.labels.map(labelChip).join('')}</div>${ticket.commits.length ? `<div class="row-commits">${commitChips(ticket)}</div>` : ''}</td><td>${stateChip(ticket.displayState)}${ticket.displayState === 'In progress' ? completionChip(ticket.progress.total ? Math.round(ticket.progress.checked / ticket.progress.total * 100) : 0) : ''}</td><td><span class="ticket-summary" title="${escapeHTML(summary(ticket))}">${escapeHTML(summary(ticket))}</span></td></tr>`).join('')}</tbody></table>` : `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${featureTickets.length ? 'No tickets match these filters' : selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>${featureTickets.length ? 'Change the selected labels or status, or clear the filters.' : selectedFeature ? 'Tickets will appear here when they are created.' : 'Create a feature and its tickets with to-tickets, then select Refresh.'}</p></div>`;
+  el('ticket-list').hidden = ticketView === 'graph';
+  el('ticket-graph').hidden = ticketView !== 'graph';
+  for (const button of document.querySelectorAll('[data-ticket-view]')) button.setAttribute('aria-pressed', String(button.dataset.ticketView === ticketView));
+  if (ticketView === 'graph') renderGraph();
   const ticket = snapshot.tickets.find((item) => item.id === selectedTicket);
   const feature = snapshot.features.find((item) => item.name === selectedFeature);
   if (ticket) {
@@ -408,7 +445,10 @@ function applySnapshot(data) {
   normalizeSelection();
   el('error').hidden = true; renderFilters(); render();
   if (first && saved?.scroll && saved.ticket === selectedTicket && saved.feature === selectedFeature) restoreScroll(saved.scroll);
-  if (focusKey) document.querySelector(`[${focusKey[0]}="${CSS.escape(focusKey[1])}"]`)?.focus({ preventScroll: true });
+  if (focusKey) {
+    const scope = focusKey[0] === 'data-ticket' && ticketView === 'graph' ? el('ticket-graph') : document;
+    scope.querySelector(`[${focusKey[0]}="${CSS.escape(focusKey[1])}"]`)?.focus({ preventScroll: true });
+  }
   writeRoute();
 }
 
@@ -459,6 +499,25 @@ el('ticket-list').addEventListener('click', (event) => {
   if (!ticketButton) return;
   navigateTicket(ticketButton.dataset.ticket);
 });
+document.querySelector('.view-switch').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-ticket-view]');
+  if (!button) return;
+  recordCurrentScroll(); ticketView = button.dataset.ticketView; render(); writeRoute('push');
+});
+function activateGraphNode(event) {
+  const node = event.target.closest('[data-ticket]');
+  if (!node || (event.type === 'keydown' && !['Enter', ' '].includes(event.key))) return;
+  event.preventDefault(); navigateTicket(node.dataset.ticket);
+  el('ticket-graph').querySelector(`[data-ticket="${CSS.escape(node.dataset.ticket)}"]`)?.focus({ preventScroll: true });
+}
+el('ticket-graph').addEventListener('click', activateGraphNode);
+el('ticket-graph').addEventListener('keydown', activateGraphNode);
+for (const type of ['pointerover', 'focusin']) el('ticket-graph').addEventListener(type, (event) => {
+  const node = event.target.closest('[data-ticket]');
+  const tooltip = el('graph-tooltip');
+  if (node && tooltip) { tooltip.textContent = node.getAttribute('aria-label'); tooltip.hidden = false; }
+});
+for (const type of ['pointerleave', 'focusout']) el('ticket-graph').addEventListener(type, () => { if (el('graph-tooltip')) el('graph-tooltip').hidden = true; });
 el('detail').addEventListener('click', (event) => {
   const link = event.target.closest('[data-ticket]');
   if (!link) return;

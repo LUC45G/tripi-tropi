@@ -45,7 +45,7 @@ test('isolated installation is complete, launches two repositories, and updates 
       try {
         const snapshot = await (await fetch(`${url}/api/snapshot`)).json();
         assert.equal(snapshot.tickets[0].title, `Original ${index}`);
-        for (const resource of ['/', '/app.js', '/style.css', '/icon.svg', '/vendor/marked.js', '/vendor/purify.js', '/vendor/gsap.js']) assert.equal((await fetch(`${url}${resource}`)).status, 200);
+        for (const resource of ['/', '/app.js', '/graph.mjs', '/style.css', '/icon.svg', '/vendor/marked.js', '/vendor/purify.js', '/vendor/gsap.js']) assert.equal((await fetch(`${url}${resource}`)).status, 200);
         assert.equal(await readFile(path.join(issues, '01-demo.md'), 'utf8'), ticket);
       } finally { await launch(skill, repo, true); }
     }

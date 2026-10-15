@@ -12,6 +12,7 @@ const skillVersion = JSON.parse(readFileSync(path.join(skillRoot, 'package.json'
 const staticFiles = new Map([
   ['/', ['assets/index.html', 'text/html']],
   ['/app.js', ['assets/app.js', 'text/javascript']],
+  ['/graph.mjs', ['assets/graph.mjs', 'text/javascript']],
   ['/style.css', ['assets/style.css', 'text/css']],
   ['/icon.svg', ['assets/icon.svg', 'image/svg+xml']],
   ['/vendor/marked.js', ['node_modules/marked/lib/marked.umd.js', 'text/javascript']],
