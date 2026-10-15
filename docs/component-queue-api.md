@@ -1,8 +1,8 @@
 # API de planificación de componentes
 
-Servicio de graph-view 03, utilizado por los controles visuales de 04. En el grafo, aislar el componente y elegir `Review component` abre la revisión accesible con orden, completados, advertencias y confirmaciones. Una solicitud entrega **una instrucción secuencial al agente**; no crea un scheduler en el viewer ni implementa tickets por sí misma.
+Servicio de graph-view 03, utilizado por los controles visuales de 04. En el grafo, aislar el componente y elegir `Review dependencies` abre la revisión accesible con orden, completados, advertencias y confirmaciones. Una solicitud entrega **una instrucción secuencial al agente**; no crea un scheduler en el viewer ni implementa tickets por sí misma.
 
-La UI invalida revisiones y limpia confirmaciones si cambian los tickets relevantes o el contexto de feature, filtros, aislamiento o destino. No revisa ni reenvía automáticamente: se usa `Review again`. `Cancel`/Escape cierran una revisión sin enviar; una entrega ya iniciada continúa si se cierra el diálogo o el viewer.
+La UI invalida revisiones y limpia confirmaciones si cambian los tickets relevantes o el contexto de feature, filtros, aislamiento o destino. No revisa ni reenvía automáticamente: se cierra el diálogo y se vuelve a elegir `Review dependencies`. `Cancel`, Escape o un click que empieza y termina fuera del modal cierran una revisión sin enviar. Arrastrar desde dentro hacia fuera no lo cierra; una entrega ya iniciada continúa si se cierra el diálogo o el viewer.
 
 ## Autenticación y entradas
 
@@ -13,7 +13,9 @@ Todas las rutas siguientes son POST al origen loopback del viewer y requieren:
 - `X-Queue-Token`: `token` obtenido de `GET /api/queue`.
 - Cuerpo JSON de hasta 4096 bytes UTF-8; los caracteres divididos entre chunks se decodifican correctamente.
 
-`ticket` es el identificador del snapshot, por ejemplo `graph-view/03-programar-conjuntos-en-agente.md`, no una ruta arbitraria. El servidor descubre el componente completo de esa feature, incluyendo tickets completados y los ocultos/atenuados por filtros. No acepta listas, orden, instrucciones, permisos ni parámetros adicionales del cliente.
+`ticket` es el identificador del ticket objetivo del snapshot, por ejemplo `graph-view/03-programar-conjuntos-en-agente.md`, no una ruta arbitraria. El servidor incluye ese ticket y todos sus prerrequisitos locales transitivos, recorriendo dependencias hacia atrás hasta las raíces. Excluye descendientes y ramas hermanas, aunque compartan un padre; incluye completados como contexto y tickets atenuados por filtros. Las dependencias externas se validan y pueden provocar una pausa, pero no agregan trabajo externo. No acepta listas, orden, instrucciones, permisos ni parámetros adicionales del cliente.
+
+Las rutas `component-*` y el campo `plan.component` conservan sus nombres por compatibilidad; representan este conjunto de dependencias, no un componente conexo del grafo.
 
 ## 1. Revisar: POST /api/component-plan
 

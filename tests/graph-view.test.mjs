@@ -100,14 +100,17 @@ async function fixture(t) {
 }
 const stop = (viewer) => new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
 
-test('graph components include completed bridges and ignore external markers while updating connectivity', () => {
+test('graph dependency sets follow prerequisites, exclude sibling branches and ignore external markers', () => {
   const tickets = [node(1, { displayState: 'Completed' }), node(2, { dependencies: [dependency(1)] }), node(3, { dependencies: [dependency(1, 'external')] })];
   let graph = projectGraph(tickets, 'demo');
   assert.deepEqual([...graphComponent(graph, tickets[1].id)].sort(), [tickets[0].id, tickets[1].id]);
   assert.deepEqual([...graphComponent(graph, tickets[2].id)], [tickets[2].id]);
   assert.equal(graphComponent(graph, 'deleted').size, 0);
+  tickets[2].dependencies.push(dependency(1)); graph = projectGraph(tickets, 'demo');
+  assert.deepEqual([...graphComponent(graph, tickets[1].id)].sort(), [tickets[0].id, tickets[1].id]);
+  assert.deepEqual([...graphComponent(graph, tickets[0].id)], [tickets[0].id]);
   tickets[2].dependencies.push(dependency(2)); graph = projectGraph(tickets, 'demo');
-  assert.equal(graphComponent(graph, tickets[0].id).size, 3);
+  assert.equal(graphComponent(graph, tickets[2].id).size, 3);
 });
 
 test('graph preferences retain existing positions, place new nodes without overlap and discard invalid or deleted state', () => {
@@ -119,6 +122,12 @@ test('graph preferences retain existing positions, place new nodes without overl
   assert.equal(Object.hasOwn(state.positions, 'deleted'), false);
   assert.deepEqual(state.view, { x: 0, y: 0, zoom: 1 }); assert.equal(state.isolated, null);
   assert.deepEqual(reconcileGraph(graph, state), state);
+  assert.equal(state.bounds.right - state.bounds.left + 96, state.width * 4);
+  assert.equal(state.bounds.bottom - state.bounds.top + 96, state.height * 4);
+  const expanded = reconcileGraph(graph, { ...state, positions: { ...state.positions, [node(1).id]: { x: -75, y: -72 } } });
+  assert.deepEqual(expanded.positions[node(1).id], { x: -75, y: -72 });
+  assert.equal(expanded.width, state.width); assert.equal(expanded.height, state.height);
+  assert.deepEqual(expanded.view, state.view);
   assert.ok(Number.isFinite(reconcileGraph(graph, { positions: { [node(1).id]: { x: 1e300, y: -1 } } }).width));
   assert.equal(reconcileGraph(graph, { isolated: node(1).id, view: { zoom: 90 } }).view.zoom, 4);
 });
@@ -255,22 +264,44 @@ test('browser graph drags and pans without opening tickets, persists exploration
     assert.equal(await page.locator('#detail-kind').textContent(), 'Feature overview');
     await first.click(); assert.equal(await page.locator('#detail-kind').textContent(), 'Ticket 01');
     await first.focus(); await page.keyboard.press('ArrowRight');
+    for (let step = 0; step < 10; step++) { await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowLeft'); }
     const moved = await first.getAttribute('transform');
+    assert.ok(Number(moved.match(/translate\(([-\d.]+)/)[1]) < 0);
     await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
     assert.equal(await page.locator('#graph-zoom').textContent(), '125%');
     const oldView = await graph.locator('svg').getAttribute('viewBox'); const canvas = await graph.locator('svg').boundingBox();
     await page.mouse.move(canvas.x + 5, canvas.y + 5); await page.mouse.down();
     await page.mouse.move(canvas.x + 30, canvas.y + 20, { steps: 5 }); await page.mouse.up();
     assert.notEqual(await graph.locator('svg').getAttribute('viewBox'), oldView);
-    await page.getByRole('button', { name: 'Isolate component', exact: true }).click();
-    assert.equal(await graph.locator('.graph-node').count(), 2);
+    await graph.locator('[data-ticket="demo/02-task.md"]').click();
     await page.locator('#status-summary').click(); await page.locator('[data-state="Completed"]').click();
-    assert.equal(await graph.locator('.graph-node').count(), 2);
+    await page.locator('#label-summary').click(); await page.locator('[data-label="ready-for-agent"]').check();
+    await page.locator('#label-summary').click();
+    await page.getByRole('button', { name: 'Isolate dependencies', exact: true }).click();
+    assert.equal(await page.locator('#status-summary').textContent(), 'All states');
+    assert.equal(await page.locator('#label-summary').textContent(), 'All labels');
+    assert.equal(new URL(page.url()).searchParams.has('state'), false);
+    assert.equal(new URL(page.url()).searchParams.has('label'), false);
+    assert.equal(await graph.locator('.graph-dimmed').count(), 0);
+    assert.equal(await graph.locator('#graph-legend').count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Show all', exact: true }).count(), 0);
+    await page.getByRole('button', { name: 'Isolate dependencies', exact: true }).click();
+    assert.equal(await graph.locator('.graph-outside').count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Isolate dependencies', exact: true }).getAttribute('aria-pressed'), 'false');
+    assert.equal(await page.getByRole('button', { name: 'Review dependencies', exact: true }).isDisabled(), true);
+    await page.getByRole('button', { name: 'Isolate dependencies', exact: true }).click();
+    assert.equal(await graph.locator('.graph-node').count(), 3);
+    assert.equal(await graph.locator('.graph-node:not(.graph-outside)').count(), 2);
+    assert.equal(await graph.locator('[data-ticket="demo/03-task.md"].graph-outside').count(), 1);
+    assert.equal(await graph.locator('.graph-component').textContent(), 'Dependencies for 02 (2 tickets): 01, 02');
+    assert.equal(await page.getByRole('button', { name: 'Isolate dependencies', exact: true }).getAttribute('aria-pressed'), 'true');
+    await page.locator('#status-summary').click(); await page.locator('[data-state="Completed"]').click();
+    assert.equal(await graph.locator('.graph-node').count(), 3);
     assert.equal(await graph.locator('[data-ticket="demo/02-task.md"].graph-dimmed').count(), 1);
     const isolatedView = await graph.locator('svg').getAttribute('viewBox');
     await page.goto(viewer.url);
     await first.waitFor();
-    assert.equal(await graph.isVisible(), true); assert.equal(await graph.locator('.graph-node').count(), 2);
+    assert.equal(await graph.isVisible(), true); assert.equal(await graph.locator('.graph-node:not(.graph-outside)').count(), 2);
     assert.equal(await first.getAttribute('transform'), moved);
     assert.equal(await graph.locator('svg').getAttribute('viewBox'), isolatedView);
     await page.locator('[data-feature="other"]').click();
@@ -280,13 +311,21 @@ test('browser graph drags and pans without opening tickets, persists exploration
     await page.locator('[data-feature="other"]').click(); assert.equal(await graph.isVisible(), false);
     await page.locator('[data-feature="demo"]').click();
     const newFile = await f.put('demo', '04', body('04', 'New dependent', { blockers: '02' }));
-    await page.waitForFunction(() => document.querySelectorAll('#ticket-graph .graph-node').length === 3);
+    await graph.locator('[data-ticket="demo/04-task.md"].graph-outside').waitFor();
+    assert.equal(await graph.locator('.graph-node:not(.graph-outside)').count(), 2);
+    await writeFile(newFile, body('04', 'New prerequisite'));
+    await writeFile(secondFile, body('02', 'Dependent', { blockers: '01, 04' }));
+    await page.waitForFunction(() => document.querySelectorAll('#ticket-graph .graph-node:not(.graph-outside)').length === 3);
+    await graph.locator('[data-ticket="demo/01-task.md"]').click();
+    assert.equal(await graph.locator('.graph-node:not(.graph-outside)').count(), 1);
+    assert.match(await graph.locator('.graph-component').textContent(), /^Dependencies for 01/);
+    await graph.locator('[data-ticket="demo/02-task.md"]').click();
     assert.equal(await first.getAttribute('transform'), moved);
     await rm(secondFile);
-    await page.waitForFunction(() => document.querySelectorAll('#ticket-graph .graph-node').length === 1);
+    await page.waitForFunction(() => document.querySelectorAll('#ticket-graph .graph-node').length === 3 && !document.querySelector('#ticket-graph .graph-outside'));
     await rm(firstFile);
     await page.waitForFunction(() => document.querySelector('#detail-kind').textContent === 'Feature overview' && document.querySelectorAll('#ticket-graph .graph-node').length === 2);
-    assert.equal(await page.getByRole('button', { name: 'Show all', exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: 'Isolate dependencies', exact: true }).getAttribute('aria-pressed'), 'false');
     await page.getByRole('button', { name: 'Rearrange', exact: true }).click();
     await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
     await page.setViewportSize({ width: 390, height: 844 });

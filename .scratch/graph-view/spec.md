@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Explorar las dependencias de los tickets en una vista alternativa a la lista y programar la implementación secuencial de un componente mediante una única instrucción al agente. Diseño confirmado por el usuario; implementación de 01–04 completada. Entrega al agente verificada con simulación, no con una implementación real del conjunto.
+Explorar las dependencias de los tickets en una vista alternativa a la lista y programar la implementación secuencial del ticket objetivo y sus prerrequisitos mediante una única instrucción al agente. Diseño confirmado por el usuario; implementación de 01–04 completada. Entrega al agente verificada con simulación, no con una implementación real del conjunto.
 
 ## Vista y alcance
 
@@ -20,14 +20,15 @@ Explorar las dependencias de los tickets en una vista alternativa a la lista y p
 - Layout automático inicial, nodos arrastrables, control para encuadrar y acción de reorganización automática.
 - Posiciones y vista del grafo se guardan en el navegador por repositorio y feature; no se escriben archivos ni coordenadas en tickets.
 - Las actualizaciones en vivo conservan posiciones de nodos existentes y contexto de lectura; altas, bajas y cambios de dependencias se reflejan sin reorganizar todo innecesariamente.
-- `Isolate component` muestra el componente del nodo seleccionado; `Show all` restaura la feature. Se usa conexión débil: se ignora la dirección de las aristas locales para calcular pertenencia, incluyendo tickets completados que conectan el conjunto.
+- El conjunto de dependencias incluye el ticket seleccionado y todos sus prerrequisitos locales transitivos, recorriendo las aristas hacia atrás hasta las raíces sin dependencia previa. No es un componente conexo: excluye descendientes y ramas hermanas aunque compartan un padre. Por ejemplo, con `01 → 02` y `01 → 03`, seleccionar 02 incluye solamente 01 y 02. Los completados permanecen como contexto y las dependencias externas conservan su tratamiento de frontera.
+- `Isolate dependencies` es un toggle que destaca ese conjunto y mantiene el resto visible pero atenuado; un indicador identifica el ticket objetivo y enumera sus integrantes. Al activarlo se limpian los filtros de label y estado para no atenuar sus prerrequisitos. Al desactivarlo se elimina el aislamiento y los filtros permanecen como estén; no se restauran los anteriores. Cambiar de ticket recalcula el conjunto, incluso al seleccionar un antecesor ya destacado. El botón muestra estado activo; reemplaza la acción separada `Show all`. Si se aplican nuevos filtros después, conservan su atenuación y no cambian la pertenencia.
 - Un componente fuertemente conexo de varios nodos es un ciclo, no una unidad ejecutable. Los ciclos impiden programar el conjunto.
 - Se mantiene accesibilidad de controles, selección de tickets y contenido; los atajos globales de teclado siguen fuera de alcance.
 
-## Programación de un componente
+## Programación del ticket objetivo y sus prerrequisitos
 
-1. El usuario aísla un componente y solicita programarlo. Se presenta el conjunto y su orden; los filtros visuales no recortan sus integrantes.
-2. El servidor vuelve a leer el componente y sus dependencias desde disco. Todos los tickets no completados deben tener Execution pending, aprobación ready-for-agent, estructura válida y atomicidad. Tickets reclamados, en progreso, descartados sin satisfacer una dependencia, referencias inválidas y ciclos no se omiten para forzar un envío.
+1. El usuario selecciona el ticket objetivo, aísla sus dependencias y elige `Review dependencies`. Se presenta exclusivamente ese ticket con sus prerrequisitos locales y su orden; los filtros visuales no recortan sus integrantes. Seleccionar una raíz sin dependencias incluye solamente esa raíz.
+2. El servidor vuelve a leer el conjunto y sus dependencias desde disco. Todos los tickets no completados deben tener Execution pending, aprobación ready-for-agent, estructura válida y atomicidad. Tickets reclamados, en progreso, descartados sin satisfacer una dependencia, referencias inválidas y ciclos no se omiten para forzar un envío.
 3. El orden es topológico dentro del componente. Entre candidatos disponibles se desempata por número ascendente. Los completados se conservan como contexto y se omiten del trabajo; no hay envío si no queda trabajo.
 4. Se permite incluir un sucesor bloqueado por un predecesor pendiente del mismo conjunto. Esta regla pertenece al flujo de conjuntos; el envío individual sigue requiriendo todas sus dependencias completadas.
 5. Si alguna dependencia externa válida está pendiente, advertir antes del envío: `This ticket has an external dependency. The implementation flow will pause before completing the full set. Continue?`. Mostrar los tickets afectados y sus dependencias. Ofrecer cancelar para resolverlas antes o confirmar para continuar hasta la pausa. Nunca incluir automáticamente trabajo de otra feature.

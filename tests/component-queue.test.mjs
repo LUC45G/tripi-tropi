@@ -35,26 +35,28 @@ function snapshot(entries) {
   return deriveTicketStates(validateGraph(entries.map(([number, options = {}, feature = 'demo']) => parseTicket(body(number, options), { feature, filename: `${String(number).padStart(2, '0')}-task.md`, strict: true }))));
 }
 
-test('component planner discovers weak connectivity and orders available work by dependencies then number', () => {
+test('component planner discovers only selected-ticket prerequisites and orders available work by dependencies then number', () => {
   const tickets = snapshot([[1, { blockers: '05' }], [2], [3, { blockers: '01' }], [5], [6, { blockers: '02' }], [7, { blockers: '03, 06' }], [9], [1, {}, 'other']]);
   const before = structuredClone(tickets);
   const result = planComponent(tickets, id(7));
   assert.equal(result.code, 200);
   assert.deepEqual(result.plan.order.map((ticket) => ticket.number), [2, 5, 1, 3, 6, 7]);
-  assert.deepEqual(planComponent([...tickets].reverse(), id(1)).plan, result.plan);
+  assert.deepEqual(planComponent([...tickets].reverse(), id(7)).plan, result.plan);
   assert.equal(result.plan.component.length, 6);
+  assert.deepEqual(planComponent(tickets, id(1)).plan.order.map((ticket) => ticket.number), [5, 1]);
+  assert.deepEqual(planComponent(tickets, id(2)).plan.order.map((ticket) => ticket.number), [2]);
   assert.deepEqual(result.plan.warnings, []);
   assert.deepEqual(tickets, before);
 });
 
-test('component planner keeps completed bridges as context and identifies the first external pause', () => {
-  const result = planComponent(snapshot([[1, { execution: 'completed' }], [2, { blockers: '01, other:01' }], [3, { blockers: '01' }], [1, {}, 'other']]), id(3));
+test('component planner keeps completed prerequisites as context and identifies the first external pause', () => {
+  const result = planComponent(snapshot([[1, { execution: 'completed' }], [2, { blockers: '01, other:01' }], [3, { blockers: '01' }], [1, {}, 'other']]), id(2));
   assert.equal(result.code, 200);
   assert.deepEqual(result.plan.completed, [id(1)]);
-  assert.deepEqual(result.plan.order.map((ticket) => ticket.number), [2, 3]);
+  assert.deepEqual(result.plan.order.map((ticket) => ticket.number), [2]);
   assert.equal(result.plan.pauseBefore, id(2));
   assert.equal(result.plan.warnings[0].dependency, id(1, 'other'));
-  assert.equal(result.plan.component.length, 3);
+  assert.equal(result.plan.component.length, 2);
   const ready = planComponent(snapshot([[1, { blockers: 'other:01' }], [1, { execution: 'completed' }, 'other']]), id(1));
   assert.deepEqual(ready.plan.warnings, []);
   assert.equal(ready.plan.pauseBefore, null);
@@ -124,16 +126,18 @@ test('component confirmation binds full relevant files, membership, dependencies
   await f.put(1, { execution: 'completed', text: 'External content changed.' }, 'other');
   assert.equal((await queue.copyComponent(id(1), reviewedOptions(review))).code, 409);
   review = await queue.reviewComponent(id(1)); await f.put(2, { blockers: '01' });
+  assert.equal((await queue.copyComponent(id(1), reviewedOptions(review))).code, 200);
+  await f.put(2); await f.put(1, { blockers: '02, other:01' });
   assert.equal((await queue.copyComponent(id(1), reviewedOptions(review))).code, 409);
   review = await queue.reviewComponent(id(1)); await f.put(9, {}, 'unrelated');
   assert.equal((await queue.copyComponent(id(1), reviewedOptions(review))).code, 200);
   assert.equal((await queue.copyComponent(id(1), { reviewToken: '0'.repeat(64) })).code, 409);
   assert.equal((await queue.copyComponent(id(1))).code, 409);
-  await f.put(2, { blockers: '01', status: 'needs-info' });
+  await f.put(2, { status: 'needs-info' });
   assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(review))).code, 409);
-  await f.put(2, { blockers: '01', execution: 'in-progress' });
+  await f.put(2, { execution: 'in-progress' });
   assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(review))).code, 409);
-  await f.put(2, { blockers: '01' });
+  await f.put(2);
   await queue.setThread(null);
   assert.equal((await queue.copyComponent(id(1), reviewedOptions(review))).code, 409);
   assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(review))).code, 409);
@@ -143,19 +147,19 @@ test('component confirmation binds full relevant files, membership, dependencies
 test('external dependencies require explicit current-plan confirmation and never add external work', async (t) => {
   const f = await fixture(t); await f.put(1); await f.put(2, { blockers: '01, other:01' }); await f.put(1, {}, 'other');
   const sent = []; const queue = await createQueue({ ...f.options, deliver: async (value) => sent.push(value) });
-  const review = await queue.reviewComponent(id(1));
+  const review = await queue.reviewComponent(id(2));
   assert.equal(review.plan.pauseBefore, id(2));
   assert.equal(review.plan.warnings[0].dependency, id(1, 'other'));
-  assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(review))).code, 409);
-  assert.equal((await queue.copyComponent(id(1), reviewedOptions(review))).code, 409);
-  assert.equal((await queue.copyComponent(id(1), reviewedOptions(review, { confirmExternal: false }))).code, 409);
+  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(review))).code, 409);
+  assert.equal((await queue.copyComponent(id(2), reviewedOptions(review))).code, 409);
+  assert.equal((await queue.copyComponent(id(2), reviewedOptions(review, { confirmExternal: false }))).code, 409);
   assert.deepEqual(queue.info().records, {}); assert.equal(sent.length, 0);
-  const copy = await queue.copyComponent(id(1), reviewedOptions(review, { confirmExternal: true }));
+  const copy = await queue.copyComponent(id(2), reviewedOptions(review, { confirmExternal: true }));
   assert.equal(copy.code, 200); assert.deepEqual(copy.plan.order.map((ticket) => ticket.id), [id(1), id(2)]);
   await f.put(1, { execution: 'completed' }, 'other');
-  assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(review, { confirmExternal: true }))).code, 409);
-  const fresh = await queue.reviewComponent(id(1)); assert.deepEqual(fresh.plan.warnings, []);
-  assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(fresh))).code, 200);
+  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(review, { confirmExternal: true }))).code, 409);
+  const fresh = await queue.reviewComponent(id(2)); assert.deepEqual(fresh.plan.warnings, []);
+  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(fresh))).code, 200);
   assert.equal(sent.length, 1);
 });
 
@@ -164,8 +168,8 @@ test('component reservations block concurrent, overlapping and restarted sends a
   let release; const waiting = new Promise((resolve) => { release = resolve; }); let started;
   const delivered = new Promise((resolve) => { started = resolve; });
   const queue = await createQueue({ ...f.options, deliver: async () => { started(); await waiting; } });
-  const review = await queue.reviewComponent(id(1));
-  const sending = Promise.all([queue.enqueueComponent(id(1), reviewedOptions(review)), queue.enqueueComponent(id(2), reviewedOptions(review))]);
+  const review = await queue.reviewComponent(id(2));
+  const sending = Promise.all([queue.enqueueComponent(id(2), reviewedOptions(review)), queue.enqueueComponent(id(2), reviewedOptions(review))]);
   try {
     await delivered;
     assert.equal(queue.info().records[id(2)].status, 'Sending');
@@ -188,22 +192,22 @@ test('component reservations block concurrent, overlapping and restarted sends a
 test('manual component resumption skips completed work and requires acknowledgment of a previously paused flow', async (t) => {
   const f = await fixture(t); await f.put(1); await f.put(2, { blockers: '01, other:01' }); await f.put(3, { blockers: '02' }); await f.put(1, {}, 'other');
   const sent = []; let queue = await createQueue({ ...f.options, deliver: async (value) => sent.push(value) });
-  const first = await queue.reviewComponent(id(1));
-  const delivery = await queue.enqueueComponent(id(1), reviewedOptions(first, { confirmExternal: true }));
+  const first = await queue.reviewComponent(id(3));
+  const delivery = await queue.enqueueComponent(id(3), reviewedOptions(first, { confirmExternal: true }));
   assert.equal(delivery.code, 200);
-  const premature = await queue.reviewComponent(id(2));
+  const premature = await queue.reviewComponent(id(3));
   assert.equal(premature.requiresPausedConfirmation, false);
-  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(premature, { confirmExternal: true, confirmPaused: true }))).code, 409);
+  assert.equal((await queue.enqueueComponent(id(3), reviewedOptions(premature, { confirmExternal: true, confirmPaused: true }))).code, 409);
   await f.put(1, { execution: 'completed' }); await f.put(1, { execution: 'completed' }, 'other');
   queue = await createQueue({ ...f.options, deliver: async (value) => sent.push(value) });
-  const resumed = await queue.reviewComponent(id(2));
+  const resumed = await queue.reviewComponent(id(3));
   assert.equal(resumed.requiresPausedConfirmation, true);
   assert.deepEqual(resumed.plan.order.map((ticket) => ticket.id), [id(2), id(3)]);
-  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(resumed))).code, 409);
+  assert.equal((await queue.enqueueComponent(id(3), reviewedOptions(resumed))).code, 409);
   const recordsBeforeCopy = structuredClone(queue.info().records);
-  assert.equal((await queue.copyComponent(id(2), reviewedOptions(resumed, { confirmPaused: true }))).code, 200);
+  assert.equal((await queue.copyComponent(id(3), reviewedOptions(resumed, { confirmPaused: true }))).code, 200);
   assert.deepEqual(queue.info().records, recordsBeforeCopy);
-  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(resumed, { confirmPaused: true }))).code, 200);
+  assert.equal((await queue.enqueueComponent(id(3), reviewedOptions(resumed, { confirmPaused: true }))).code, 200);
   assert.equal(queue.info().records[delivery.record.batch].status, 'Paused');
   assert.equal(sent.length, 2);
   assert.deepEqual(JSON.parse(sent[1].message.split('Reviewed plan (completed tickets are context only; never add tickets or external-feature work):\n')[1].split('\nBefore EACH ticket')[0]).order.map((ticket) => ticket.id), [id(2), id(3)]);
@@ -212,8 +216,8 @@ test('manual component resumption skips completed work and requires acknowledgme
 test('failed and interrupted component deliveries stay reserved without automatic retry', async (t) => {
   const f = await fixture(t); await f.put(1); await f.put(2, { blockers: '01' }); let calls = 0;
   let queue = await createQueue({ ...f.options, deliver: async () => { calls++; throw new Error('Uncertain delivery'); } });
-  const first = await queue.reviewComponent(id(1));
-  assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(first))).code, 502);
+  const first = await queue.reviewComponent(id(2));
+  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(first))).code, 502);
   assert.equal(queue.info().records[id(2)].status, 'Error');
   const ledger = path.join(f.stateDirectory, (await readdir(f.stateDirectory))[0]);
   const records = JSON.parse(await readFile(ledger, 'utf8'));
@@ -221,8 +225,8 @@ test('failed and interrupted component deliveries stay reserved without automati
   await writeFile(ledger, JSON.stringify(records));
   queue = await createQueue({ ...f.options, deliver: async () => { calls++; } });
   assert.equal(queue.info().records[id(1)].status, 'Error');
-  const review = await queue.reviewComponent(id(1));
-  assert.equal((await queue.enqueueComponent(id(1), reviewedOptions(review, { confirmPaused: true }))).code, 409);
+  const review = await queue.reviewComponent(id(2));
+  assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(review, { confirmPaused: true }))).code, 409);
   assert.equal((await queue.enqueue(id(1))).code, 409);
   assert.equal(calls, 1);
 });
