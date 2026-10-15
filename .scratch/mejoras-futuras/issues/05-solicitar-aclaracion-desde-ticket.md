@@ -1,9 +1,9 @@
 # 05: Solicitar aclaraciones desde el detalle de un ticket
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: frontend, backend
 Blocked by: 02
-Commits: none
+Commits: a9d91e4e9d61
 Verbosity: 1
 
 ## Estado inicial
@@ -32,4 +32,4 @@ La UI y su servicio entregan una única acción completa y verificable. El anál
 
 ## Estado posterior
 
-Acción disponible en el viewer; pendiente registrar hash real y validar cierre.
+Clarify ticket disponible con nota, copia, cola y confirmación manual; Split ticket no implementado.
