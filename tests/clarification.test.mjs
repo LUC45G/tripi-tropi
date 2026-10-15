@@ -46,7 +46,7 @@ const stop = (viewer) => new Promise((resolve) => { viewer.server.close(resolve)
 test('clarification instruction preserves triage, interview fallback, approval and execution boundaries', () => {
   const ticket = { feature: 'demo', filename: '01-task.md', triageRole: 'needs-info', execution: 'pending', labels: ['backend'] };
   const message = clarificationMessage('/repo', ticket, 'Only acceptance criteria.');
-  for (const pattern of [/needs-info/, /needs-triage/, /ready-for-human/, /grill-me if available/, /short rounds/, /wait for.*answers/, /CLI/, /explicit user approval before ANY file writes/, /Never expand, split or rewrite a completed/, /Do not expand or split an in-progress/, /Do not implement it/, /Only acceptance criteria/, /never split automatically/, /Keep current permissions/]) assert.match(message, pattern);
+  for (const pattern of [/needs-info/, /needs-triage/, /ready-for-human/, /grill-me if available/, /short rounds/, /wait for answers/, /CLI/, /explicit user approval before ANY file writes/, /Never expand, split or rewrite a completed/, /Do not expand or split an in-progress/, /Do not implement it/, /Only acceptance criteria/, /never split automatically/, /Keep current permissions/, /ALL dependencies/, /recommend answers/, /approval and blockers still govern readiness/, /propose correcting stale needs-info/, /Never invent hashes or push without an explicit request/, /Start on receipt/]) assert.match(message, pattern);
 });
 
 test('clarification preview and copy support unready tickets without writes or a linked agent', async (t) => {

@@ -188,6 +188,8 @@ Fuente: [tests/audit-regressions.test.mjs](../tests/audit-regressions.test.mjs).
 
 Fuente: [tests/clarification.test.mjs](../tests/clarification.test.mjs). Contrato: [API de aclaración](clarification-api.md).
 
+Los mensajes compactos se comprueban por sus reglas de aprobación, atomicidad, relectura y alcance. Las pruebas de conjuntos también comparan el plan JSON completo antes y después de incorporarlo a la instrucción; no prueban equivalencia de comportamiento de un agente real.
+
 | Test | Categoría | Qué se prueba | Objetivo |
 | --- | --- | --- | --- |
 | `clarification instruction preserves triage, interview fallback, approval and execution boundaries` | Unit | Triage, grill-me opcional, rondas, aprobación, notas y límites de ejecución. | Solicitar aclaraciones sin autorizar implementación ni cambios de alcance automáticos. |
