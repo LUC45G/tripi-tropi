@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,7 @@ import { homedir } from 'node:os';
 import { loadTickets } from './tickets.mjs';
 import { deriveTicketStates } from './ticket-states.mjs';
 import { readThreadName, listCodexSessions, resolveCodexThread } from './thread-name.mjs';
+import { planComponent, componentMessage } from './component-plan.mjs';
 
 export function queueMessage({ thread, message, repo, spawnProcess = spawn, timeout = 30000 }) {
   return new Promise((resolve, reject) => {
@@ -50,6 +51,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
   let activeSends = 0;
   let changingThread = false;
   const token = randomBytes(32).toString('hex');
+  const reviewSecret = randomBytes(32);
   const ledgerFor = (destination) => {
     const key = createHash('sha256').update(`${repo}\n${destination}`).digest('hex').slice(0, 24);
     return path.join(stateDirectory, `${key}.queue.json`);
@@ -106,6 +108,56 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     });
     writes = next.catch(() => {}); return next;
   }
+  async function sendAttempt(ids, message, batch = null, resumed = []) {
+    const record = { status: 'Sending', at: new Date().toISOString(), ...(batch ? { batch: batch.id } : {}) };
+    const keys = [...ids];
+    if (batch) {
+      keys.push(batch.id);
+      records[batch.id] = { ...record, tickets: ids, pauseBefore: batch.pauseBefore };
+      for (const key of resumed) records[key] = { ...records[key], status: 'Paused', acknowledgedAt: record.at, supersededBy: batch.id };
+    }
+    for (const id of ids) records[id] = { ...record };
+    try {
+      // Reserve every pending member before delivery, including those after a possible pause.
+      await persist();
+      await deliver({ repo, thread, message });
+      for (const key of keys) records[key] = { ...records[key], status: 'Queued' };
+      await persist();
+      return { code: 200, record: records[batch?.id ?? ids[0]] };
+    } catch (error) {
+      for (const key of keys) records[key] = { ...records[key], status: 'Error', error: error.message };
+      await persist().catch(() => {});
+      return { code: 502, error: `${error.message} No retry was sent. Check the linked session before retrying manually outside the viewer.`, record: records[batch?.id ?? ids[0]] };
+    }
+  }
+  async function reviewComponent(id) {
+    if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
+    const data = await loadTickets(repo, { strict: true });
+    const tickets = deriveTicketStates(data.tickets);
+    const result = planComponent(tickets, id);
+    if (result.code !== 200) return result;
+    const byId = new Map(tickets.map((ticket) => [ticket.id, ticket]));
+    const conflicts = result.plan.order.filter((ticket) => Object.hasOwn(records, ticket.id)).map((ticket) => {
+      const receipt = records[ticket.id]; const batch = records[receipt.batch];
+      const boundary = batch?.tickets?.indexOf(batch.pauseBefore) ?? -1;
+      const resumable = ['Queued', 'Paused'].includes(batch?.status) && receipt.status === 'Queued' && boundary >= 0 && batch.tickets.slice(0, boundary).every((key) => byId.get(key)?.displayState === 'Completed');
+      return { ticket: ticket.id, status: receipt.status, batch: receipt.batch ?? null, resumable };
+    });
+    const requiresPausedConfirmation = conflicts.length > 0 && conflicts.every((conflict) => conflict.resumable);
+    const fingerprint = JSON.stringify({ repo, thread, plan: result.plan, files: result.closure.map((ticket) => [ticket.id, ticket.content]), triageRoles: data.triageRoles, conflicts });
+    const reviewToken = createHmac('sha256', reviewSecret).update(fingerprint).digest('hex');
+    return { code: 200, plan: result.plan, reviewToken, conflicts, requiresPausedConfirmation };
+  }
+  async function prepareComponent(id, options = {}) {
+    const reviewed = await reviewComponent(id);
+    if (reviewed.code !== 200) return reviewed;
+    const supplied = Buffer.from(typeof options.reviewToken === 'string' ? options.reviewToken : '');
+    const expected = Buffer.from(reviewed.reviewToken);
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return { code: 409, error: 'The reviewed plan changed or expired. Review the current component again.' };
+    if (reviewed.plan.warnings.length && options.confirmExternal !== true) return { code: 409, error: 'This ticket has an external dependency. The implementation flow will pause before completing the full set. Continue?', plan: reviewed.plan };
+    if (reviewed.conflicts.length && (!reviewed.requiresPausedConfirmation || options.confirmPaused !== true)) return { code: 409, error: reviewed.requiresPausedConfirmation ? 'Confirm that the earlier agent flow is paused before manually resuming its remaining tickets.' : 'A send was already attempted for this work. Check the linked session; automatic retries are disabled.', conflicts: reviewed.conflicts };
+    return { ...reviewed, message: componentMessage(repo, reviewed.plan) };
+  }
   return {
     info: () => ({ thread: thread || null, threadName, token, records }),
     async listSessions() { return resolveSessions(); },
@@ -126,6 +178,22 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
       threadName = await resolveThreadName(thread).catch(() => null);
     },
     async copyMessage(id) { return prepareMessage(id); },
+    async reviewComponent(id) { return reviewComponent(id); },
+    async copyComponent(id, options) { return prepareComponent(id, options); },
+    async enqueueComponent(id, options) {
+      if (!thread) return { code: 409, error: 'No Codex session linked. Launch with --thread or CODEX_THREAD_ID.' };
+      if (changingThread) return { code: 409, error: 'The queue destination is changing. Retry after it has finished.' };
+      activeSends++;
+      try {
+        const prepared = await prepareComponent(id, options);
+        if (prepared.code !== 200) return prepared;
+        const ids = prepared.plan.order.map((ticket) => ticket.id);
+        // Recheck after asynchronous disk reads: another request may have reserved work.
+        if (ids.some((key) => Object.hasOwn(records, key) && !prepared.conflicts.some((conflict) => conflict.ticket === key && conflict.resumable && records[key].batch === conflict.batch && records[key].status === conflict.status))) return { code: 409, error: 'A send was already attempted. Review the component again.' };
+        const batch = { id: `@batch:${randomBytes(16).toString('hex')}`, pauseBefore: prepared.plan.pauseBefore };
+        return await sendAttempt(ids, prepared.message, batch, [...new Set(prepared.conflicts.map((conflict) => conflict.batch))]);
+      } finally { activeSends--; }
+    },
     async enqueue(id) {
       if (!thread) return { code: 409, error: 'No Codex session linked. Launch with --thread or CODEX_THREAD_ID.' };
       if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
@@ -135,18 +203,7 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
         const prepared = await prepareMessage(id);
         if (prepared.code !== 200) return prepared;
         if (Object.hasOwn(records, id)) return { code: 409, error: 'A send was already attempted. Check the linked session; automatic retries are disabled.', record: records[id] };
-        records[id] = { status: 'Sending', at: new Date().toISOString() };
-        try {
-          // Persist before delivery, so refresh/restart cannot accidentally send twice.
-          await persist();
-          await deliver({ repo, thread, message: prepared.message });
-          records[id] = { ...records[id], status: 'Queued' }; await persist();
-          return { code: 200, record: records[id] };
-        } catch (error) {
-          records[id] = { ...records[id], status: 'Error', error: error.message };
-          await persist().catch(() => {});
-          return { code: 502, error: `${error.message} No retry was sent. Check the linked session before retrying manually outside the viewer.`, record: records[id] };
-        }
+        return await sendAttempt([id], prepared.message);
       } finally { activeSends--; }
     },
   };

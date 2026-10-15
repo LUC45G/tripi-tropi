@@ -1,6 +1,6 @@
 # Catálogo de tests de tripi-tropi
 
-Inventario del checkout, basado en la versión **0.1.3** con graph-view 01: **53 tests declarados en 9 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
+Inventario del checkout, basado en la versión **0.1.3** con graph-view 01 y 03: **65 tests declarados en 10 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
 
 ## Clasificación
 
@@ -21,7 +21,8 @@ Esta clasificación documenta el alcance de los tests; el runner no tiene catego
 | `install-skill.test.mjs` | 0 | 0 | 1 | 1 |
 | `audit-regressions.test.mjs` | 1 | 7 | 1 | 9 |
 | `graph-view.test.mjs` | 4 | 0 | 2 | 6 |
-| **Total** | **17** | **26** | **10** | **53** |
+| `component-queue.test.mjs` | 4 | 8 | 0 | 12 |
+| **Total** | **21** | **34** | **10** | **65** |
 
 ## Parser y validación de tickets
 
@@ -127,6 +128,27 @@ Fuente: [tests/graph-view.test.mjs](../tests/graph-view.test.mjs).
 
 El E2E de instalación también comprueba que `/graph.mjs` se sirve desde la skill instalada. Estas pruebas no cubren arrastre, pan/zoom, aislamiento ni programación de componentes: corresponden a los siguientes tickets.
 
+## Planificación y entrega de componentes
+
+Fuente: [tests/component-queue.test.mjs](../tests/component-queue.test.mjs). Contrato: [API de componentes](component-queue-api.md).
+
+| Test | Categoría | Qué se prueba | Objetivo |
+| --- | --- | --- | --- |
+| `component planner discovers weak connectivity and orders available work by dependencies then number` | Unit | Pertenencia local, ramas, desempate entre disponibles, determinismo y ausencia de mutación. | Planificar el componente completo desde un ticket raíz sin confiar en filtros ni listas del cliente. |
+| `component planner keeps completed bridges as context and identifies the first external pause` | Unit | Conectividad mediante completados, orden pendiente, bloqueantes externos y punto inicial de pausa. | Omitir trabajo terminado conservando contexto y advertencias. |
+| `component planner rejects ineligible members, cycles, invalid references and empty work` | Unit | Triage no aprobado, ejecución no pendiente, ciclos, referencias inválidas y conjunto completado. | Evitar programar trabajo inelegible o inexistente. |
+| `component planner validates transitive external structure and refuses discarded or inconsistent prerequisites` | Unit | Prerrequisitos transitivos inválidos, descartados, ciclos externos y completados con dependencias pendientes. | No tratar una confirmación externa como permiso para ignorar errores. |
+| `component review and copy are read-only and one delivery preserves the validated instruction and individual readiness` | Integration | Archivos reales, revisión, copia sin ledger, mensaje y una entrega simulada; envío individual sigue bloqueado por dependencias pendientes. | Entregar una secuencia sin escribir tickets ni relajar el flujo individual. |
+| `component confirmation binds full relevant files, membership, dependencies and destination to the reviewed plan` | Integration | Revisión obsoleta por cambios de contenido, contexto externo, integrantes, aprobación, ejecución o destino; cambios ajenos no invalidan el plan. | Exigir una revisión vigente y rechazar firmas inventadas. |
+| `external dependencies require explicit current-plan confirmation and never add external work` | Integration | Confirmación externa, cancelación sin efectos y revalidación tras resolver un bloqueante. | Advertir sobre la pausa sin incluir trabajo de otra feature. |
+| `component reservations block concurrent, overlapping and restarted sends and protect destination changes` | Integration | Solicitudes simultáneas, solapamiento entre flujo individual y conjunto, cambio de sesión y ledger tras reinicio. | Reservar una sola entrega antes de invocar al agente. |
+| `manual component resumption skips completed work and requires acknowledgment of a previously paused flow` | Integration | Prefijo completado, revisión nueva, confirmación humana de pausa, copia sin efectos y reemplazo de reservas del trabajo restante. | Permitir una reanudación explícita sin deducir pausa efectiva del recibo Queued. |
+| `failed and interrupted component deliveries stay reserved without automatic retry` | Integration | Error simulado, recibos Sending interrumpidos y recuperación del ledger. | Conservar bloqueada una entrega incierta y evitar reintentos. |
+| `component HTTP endpoints enforce authentication, strict payloads and reviewed plan confirmation` | Integration | HTTP real: origen/token, Content-Type, campos permitidos, identificadores y revisión antes de copiar/enviar. | Mantener los límites de confianza en los tres endpoints nuevos. |
+| `component HTTP endpoints decode split Unicode and apply the byte limit on every new route` | Integration | Caracteres UTF-8 repartidos entre chunks y cuerpos superiores a 4096 bytes en plan/message/queue. | Decodificar correctamente y acotar las entradas del servicio. |
+
+La entrega se simula: las pruebas del mensaje verifican reglas de relectura, atomicidad, pausa, preguntas en CLI y commits. No observan una implementación real del conjunto ni prueban los controles de UI previstos en 04.
+
 ## Regresiones de la auditoría
 
 Fuente: [tests/audit-regressions.test.mjs](../tests/audit-regressions.test.mjs).
@@ -171,7 +193,7 @@ npm test
 
 El E2E de instalación puede necesitar acceso a npm o un cache utilizable para instalar dependencias. Los tests usan repositorios y destinos temporales y limpian sus fixtures; algunos tests de navegador guardan capturas en `.cache/` del checkout.
 
-La validación de los tickets actuales es un control adicional, separado de estos 53 tests:
+La validación de los tickets actuales es un control adicional, separado de estos 65 tests:
 
 ```sh
 npm run validate:tickets

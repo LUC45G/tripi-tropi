@@ -52,6 +52,8 @@ An exact session name must identify one entry in the local Codex index; the view
 
 Use **List / Graph** to switch the central panel between the ticket table and a dependency graph of the selected feature. Arrows follow the work flow from blocker to dependent. External dependencies appear as arrowheads only; select a ticket to inspect their details. Node borders use the first explicit label color and fills use the ticket state. Filters dim nonmatching nodes while keeping dependency context visible. Hover or focus a node for its name, then click or press Enter/Space to open the original Markdown detail. The graph updates automatically as local files change. Dragging, pan/zoom, component isolation and batch implementation are planned separately.
 
+The [component planning API](docs/component-queue-api.md) can review, copy or deliver one ordered instruction for an entire local component, with external-dependency confirmation and duplicate protection shared with individual sends. Its graph controls are not available yet. Delivery is tested with a simulated agent; sequential implementation and pauses depend on the receiving agent following the instruction.
+
 To check whether a viewer is already active for a repository, run the launcher again with the same repository and `--no-open`:
 
 ```sh
