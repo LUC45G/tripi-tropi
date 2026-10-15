@@ -1,9 +1,9 @@
 # 03: Planificar y entregar una secuencia validada de tickets al agente
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: graph-view, backend
 Blocked by: none
-Commits: none
+Commits: 2352ba7e04fd
 Verbosity: 1
 
 ## Estado inicial
@@ -39,4 +39,4 @@ El servicio acepta un ticket raíz y descubre su componente desde disco, por lo 
 
 ## Estado posterior
 
-Pendiente.
+Servicio de componentes disponible por API y verificado; implementación 2352ba7e04fd, sin push. El 04 sigue dependiendo del 02.
