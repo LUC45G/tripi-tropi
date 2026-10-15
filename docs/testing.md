@@ -1,6 +1,6 @@
 # Catálogo de tests de tripi-tropi
 
-Inventario del checkout, basado en la versión **0.1.3** con graph-view 01–04: **74 tests declarados en 11 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
+Inventario del checkout, basado en la versión **0.1.3** con graph-view 01–04: **75 tests declarados en 11 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
 
 ## Clasificación
 
@@ -22,8 +22,8 @@ Esta clasificación documenta el alcance de los tests; el runner no tiene catego
 | `audit-regressions.test.mjs` | 1 | 7 | 1 | 9 |
 | `graph-view.test.mjs` | 6 | 0 | 4 | 10 |
 | `component-queue.test.mjs` | 4 | 8 | 0 | 12 |
-| `component-ui.test.mjs` | 0 | 0 | 5 | 5 |
-| **Total** | **23** | **34** | **17** | **74** |
+| `component-ui.test.mjs` | 0 | 0 | 6 | 6 |
+| **Total** | **23** | **34** | **18** | **75** |
 
 ## Parser y validación de tickets
 
@@ -126,9 +126,9 @@ Fuente: [tests/graph-view.test.mjs](../tests/graph-view.test.mjs).
 | `graph projection handles empty features and tickets without explicit labels` | Unit | Feature vacía, ticket sin label explícita y ausencia de dependencias. | Manejar estados vacíos y borde neutro. |
 | `browser graph navigates tickets, retains filtered context and updates live with original files untouched` | E2E | SVG y colores reales, hover, selección, detalle, filtros, flechas externas, cambios en vivo, historial y regreso a lista. | Integrar el grafo con la navegación existente sin modificar tickets. |
 | `browser graph exposes cycles, invalid references and neutral labels within a responsive accessible panel` | E2E | Errores, contenido malicioso escapado, foco, Enter/Space, panel redimensionado, móvil y feature vacía. | Mostrar un grafo navegable y contenido seguro sin desbordar el layout. |
-| `graph components include completed bridges and ignore external markers while updating connectivity` | Unit | Conectividad débil local, puentes completados, raíces eliminadas y cambios de aristas. | Aislar el conjunto completo sin incorporar nodos externos ni recortarlo por estado. |
+| `graph dependency sets follow prerequisites, exclude sibling branches and ignore external markers` | Unit | Antecesores locales, raíces, ramas hermanas excluidas, completados, objetivo eliminado y cambios de aristas. | Incluir solo el objetivo y sus prerrequisitos, sin descendientes ni trabajo externo. |
 | `graph preferences retain existing positions, place new nodes without overlap and discard invalid or deleted state` | Unit | Reconciliación de posiciones/cámara, altas sin solapamientos, bajas y preferencias inválidas. | Preservar contexto espacial sin restaurar datos obsoletos o no finitos. |
-| `browser graph drags and pans without opening tickets, persists exploration and recalculates isolated components live` | E2E | Arrastre frente a click, aristas, movimiento por teclado, cámara, aislamiento, filtros, persistencia por feature, altas/bajas y layout móvil. | Explorar sin editar tickets ni perder contexto ante cambios en vivo. |
+| `browser graph drags and pans without opening tickets, persists exploration and recalculates isolated components live` | E2E | Arrastre frente a click, aristas, teclado, cámara, toggle de aislamiento, limpieza de filtros y URL al activarlo, persistencia por feature, altas/bajas y layout móvil. | Explorar sin editar tickets ni perder contexto y mostrar los prerrequisitos sin atenuación de filtros al aislarlos. |
 | `browser graph preferences are isolated by repository on the same origin and tolerate unusable storage` | E2E | Repos distintos en el mismo origen, restauración de posiciones y storage inválido/deshabilitado. | Evitar contaminación entre proyectos y mantener el visor usable sin persistencia. |
 
 El E2E de instalación también comprueba que `/graph.mjs` se sirve desde la skill instalada. Los controles de programación de componentes se verifican en component-ui.test.mjs.
@@ -139,8 +139,8 @@ Fuente: [tests/component-queue.test.mjs](../tests/component-queue.test.mjs). Con
 
 | Test | Categoría | Qué se prueba | Objetivo |
 | --- | --- | --- | --- |
-| `component planner discovers weak connectivity and orders available work by dependencies then number` | Unit | Pertenencia local, ramas, desempate entre disponibles, determinismo y ausencia de mutación. | Planificar el componente completo desde un ticket raíz sin confiar en filtros ni listas del cliente. |
-| `component planner keeps completed bridges as context and identifies the first external pause` | Unit | Conectividad mediante completados, orden pendiente, bloqueantes externos y punto inicial de pausa. | Omitir trabajo terminado conservando contexto y advertencias. |
+| `component planner discovers only selected-ticket prerequisites and orders available work by dependencies then number` | Unit | Prerrequisitos del objetivo, descendientes excluidos, raíces, desempate entre disponibles, determinismo y ausencia de mutación. | Planificar solo el objetivo y sus prerrequisitos sin confiar en filtros ni listas del cliente. |
+| `component planner keeps completed prerequisites as context and identifies the first external pause` | Unit | Antecesores completados, ramas hermanas excluidas, orden pendiente, bloqueantes externos y punto inicial de pausa. | Omitir trabajo terminado conservando contexto y advertencias. |
 | `component planner rejects ineligible members, cycles, invalid references and empty work` | Unit | Triage no aprobado, ejecución no pendiente, ciclos, referencias inválidas y conjunto completado. | Evitar programar trabajo inelegible o inexistente. |
 | `component planner validates transitive external structure and refuses discarded or inconsistent prerequisites` | Unit | Prerrequisitos transitivos inválidos, descartados, ciclos externos y completados con dependencias pendientes. | No tratar una confirmación externa como permiso para ignorar errores. |
 | `component review and copy are read-only and one delivery preserves the validated instruction and individual readiness` | Integration | Archivos reales, revisión, copia sin ledger, mensaje y una entrega simulada; envío individual sigue bloqueado por dependencias pendientes. | Entregar una secuencia sin escribir tickets ni relajar el flujo individual. |
@@ -160,6 +160,7 @@ Fuente: [tests/component-ui.test.mjs](../tests/component-ui.test.mjs). Navegador
 
 | Test | Categoría | Qué se prueba | Objetivo |
 | --- | --- | --- | --- |
+| `browser review errors identify the ticket and dismiss only when the click starts and ends outside` | E2E | Error con número y título, contenido compacto, acciones bloqueadas, padding interno, arrastres dentro/fuera en ambos sentidos, click exterior y foco al cerrar. | Identificar el ticket sin rutas internas y cerrar el modal solo ante un click exterior completo. |
 | `browser reviews full filtered components, copies without delivery and queues one instruction with separate delivery status` | E2E | Ramas, filtros atenuados, completados, copia sin ledger, foco al cancelar y doble activación durante Sending/Queued. | Revisar todo el conjunto y entregar una sola instrucción sin atribuir ejecución ni escribir tickets. |
 | `browser external confirmation cancels safely, resets on stale plans and links to blockers before review` | E2E | Advertencia/consentimiento externo, cancelación, contenido modificado en vivo, revalidación, navegación al bloqueante e inelegibilidad. | Exigir una decisión explícita vigente antes de copiar o encolar trabajo. |
 | `browser manually resumes paused component work with fresh acknowledgment and skips completed tickets` | E2E | Pausa previa simulada, prefijo y dependencia externa completados, nueva revisión y confirmación humana sin preselección. | Reanudar solo pendientes tras verificar que el flujo anterior no continuará por su cuenta. |
@@ -199,7 +200,7 @@ node --test tests/tickets.test.mjs
 node --test --test-name-pattern="absence markers" tests/audit-regressions.test.mjs
 ```
 
-Los **16 tests de navegador** necesitan un ejecutable compatible con Chromium y Playwright. En Windows buscan Edge en su ubicación estándar; en otros sistemas hay que indicar el ejecutable. Si no está disponible, se marcan como **skipped**, por lo que una suite sin fallos no garantiza que se haya probado la UI.
+Los **17 tests de navegador** necesitan un ejecutable compatible con Chromium y Playwright. En Windows buscan Edge en su ubicación estándar; en otros sistemas hay que indicar el ejecutable. Si no está disponible, se marcan como **skipped**, por lo que una suite sin fallos no garantiza que se haya probado la UI.
 
 Ejemplo en PowerShell:
 
@@ -210,7 +211,7 @@ npm test
 
 El E2E de instalación puede necesitar acceso a npm o un cache utilizable para instalar dependencias. Los tests usan repositorios y destinos temporales y limpian sus fixtures; algunos tests de navegador guardan capturas en `.cache/` del checkout.
 
-La validación de los tickets actuales es un control adicional, separado de estos 74 tests:
+La validación de los tickets actuales es un control adicional, separado de estos 75 tests:
 
 ```sh
 npm run validate:tickets
