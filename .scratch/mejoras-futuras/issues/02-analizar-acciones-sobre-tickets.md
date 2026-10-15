@@ -1,6 +1,6 @@
 # 02: Analizar acciones para pedir información y dividir tickets
-Status: needs-triage
-Execution: pending
+Status: ready-for-agent
+Execution: in-progress
 Labels: research, product
 Blocked by: none
 Commits: none
@@ -20,16 +20,18 @@ La entrega es un análisis de estas dos acciones con decisiones y preguntas pend
 
 ### Criterios de aceptación
 
-- [ ] Describir problema y flujo propuesto para pedir información: destinatario, contexto enviado, preguntas al usuario, canal de respuesta y tratamiento de una solicitud ya pendiente.
-- [ ] Describir el flujo de división: propuesta y aprobación, atomicidad de los nuevos tickets, numeración, dependencias entrantes/salientes, trazabilidad del original y tratamiento de trabajo o commits existentes.
-- [ ] Analizar acciones sobre tickets pending, in-progress y completed, identificando restricciones y riesgos de dividir trabajo ya iniciado.
-- [ ] Proponer opciones de copiar instrucciones o encolarlas al agente, sus confirmaciones, revalidación y protección contra duplicados, sin convertir la UI en editor ni prometer integraciones inexistentes.
-- [ ] Registrar alternativas, recomendación, preguntas por resolver y criterios para una futura implementación. No implementar ni cambiar estados, dependencias o archivos de tickets durante el análisis.
+- [x] Describir problema y flujo propuesto para pedir información: destinatario, contexto enviado, preguntas al usuario, canal de respuesta y tratamiento de una solicitud ya pendiente.
+- [x] Describir el flujo de división: propuesta y aprobación, atomicidad de los nuevos tickets, numeración, dependencias entrantes/salientes, trazabilidad del original y tratamiento de trabajo o commits existentes.
+- [x] Analizar acciones sobre tickets pending, in-progress y completed, identificando restricciones y riesgos de dividir trabajo ya iniciado.
+- [x] Proponer opciones de copiar instrucciones o encolarlas al agente, sus confirmaciones, revalidación y protección contra duplicados, sin convertir la UI en editor ni prometer integraciones inexistentes.
+- [x] Registrar alternativas, recomendación, preguntas por resolver y criterios para una futura implementación. No implementar ni cambiar estados, dependencias o archivos de tickets durante el análisis.
 
 ## Trabajo realizado
 
-Pendiente de análisis y revisión.
+- Aclaraciones: diseño de `Clarify ticket` confirmado con el usuario y registrado en [acciones-tickets.md](../acciones-tickets.md), incluyendo triage, nota opcional, aprobación previa a escrituras y liberación manual mediante `Allow new clarification`.
+- Alcance restante: analizar `Split ticket`, estados y trabajo previo; no se implementaron controles ni se verificó ejecución con un agente real.
+- División: revisión posterior resuelve el alcance restante con diseño confirmado de `Split ticket`, dependencias, estados y excepción obligatoria en progreso; documentadas alternativas, riesgos y verificación futura en el mismo informe.
 
 ## Estado posterior
 
-Pendiente.
+Diseño completo confirmado y documentado; pendiente registrar el commit y validar el cierre, sin implementación de controles.
