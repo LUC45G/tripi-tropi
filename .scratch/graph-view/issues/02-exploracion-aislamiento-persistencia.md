@@ -1,9 +1,9 @@
 # 02: Explorar y aislar componentes con posiciones persistentes
 Status: ready-for-agent
-Execution: in-progress
+Execution: completed
 Labels: graph-view, frontend
 Blocked by: 01
-Commits: none
+Commits: 456e722f2c0c
 Verbosity: 1
 
 ## Estado inicial
@@ -35,4 +35,4 @@ Comienza con 01 terminado y entrega el conjunto completo de herramientas de expl
 
 ## Estado posterior
 
-Pendiente.
+Exploración persistente e aislamiento disponibles, verificados en 456e722f2c0c; sin push. Dependencia 02 del ticket 04 completada.
