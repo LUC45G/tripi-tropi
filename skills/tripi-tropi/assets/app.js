@@ -1,5 +1,5 @@
 /* All file content is data. Only sanitized Markdown is inserted as HTML. */
-import { projectGraph } from './graph.mjs';
+import { projectGraph, graphComponent, reconcileGraph } from './graph.mjs';
 const el = (id) => document.getElementById(id);
 const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 let snapshot = { features: [], tickets: [], diagnostics: [] };
@@ -12,6 +12,10 @@ const filterStates = ['', 'Pending', 'Ready to implement', 'In progress', 'Block
 let workspaceKey;
 let mobileView = 'list';
 let ticketView = 'list';
+let graphWorkspaces = Object.create(null);
+let currentGraph;
+let graphGesture = null;
+let suppressGraphClick = false;
 let layout = { sidebar: 220, split: 50 };
 let sidebarCollapsed = false;
 let storageTimer;
@@ -42,7 +46,7 @@ function savedWorkspace() {
 }
 function persistWorkspace() {
   if (!workspaceKey) return;
-  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, layout, sidebarCollapsed, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
+  try { localStorage.setItem(workspaceKey, JSON.stringify({ feature: selectedFeature, ticket: selectedTicket, state: selectedState, labels: [...selectedLabels], mobileView, ticketView, graphs: graphWorkspaces, layout, sidebarCollapsed, scroll: scrollPositions() })); } catch { /* Storage disabled: the viewer still works. */ }
 }
 function readRoute() {
   const params = new URLSearchParams(location.search);
@@ -91,6 +95,9 @@ function applyMobileView() {
 function initializeWorkspace() {
   workspaceKey = `tripi-tropi:${snapshot.repo}`;
   const saved = savedWorkspace();
+  if (saved.graphs && typeof saved.graphs === 'object' && !Array.isArray(saved.graphs)) {
+    for (const [feature, value] of Object.entries(saved.graphs)) if (value && typeof value === 'object' && !Array.isArray(value)) graphWorkspaces[feature] = value;
+  }
   sidebarCollapsed = saved.sidebarCollapsed === true;
   if (Number.isFinite(saved.layout?.sidebar) && Number.isFinite(saved.layout?.split)) layout = saved.layout;
   if (location.search) readRoute();
@@ -100,6 +107,7 @@ function initializeWorkspace() {
     selectedState = typeof saved.state === 'string' ? saved.state : '';
     selectedLabels.clear(); for (const label of Array.isArray(saved.labels) ? saved.labels : []) if (typeof label === 'string') selectedLabels.add(label);
     mobileView = saved.mobileView === 'detail' ? 'detail' : 'list';
+    ticketView = (graphWorkspaces[selectedFeature]?.mode ?? saved.ticketView) === 'graph' ? 'graph' : 'list';
   }
   if (!filterStates.includes(selectedState)) selectedState = '';
   applyLayout(); return saved;
@@ -365,6 +373,15 @@ el('exit-viewer').addEventListener('click', async () => {
 
 function renderGraph() {
   const graph = projectGraph(snapshot.tickets, selectedFeature);
+  graphGesture = null;
+  const state = reconcileGraph(graph, graphWorkspaces[selectedFeature]);
+  graphWorkspaces[selectedFeature] = state;
+  if (state.isolated && selectedTicket && !graphComponent(graph, state.isolated).has(selectedTicket)) state.isolated = selectedTicket;
+  const members = state.isolated ? graphComponent(graph, state.isolated) : null;
+  graph.nodes = graph.nodes.filter((node) => !members || members.has(node.ticket.id));
+  graph.edges = graph.edges.filter((edge) => !members || (members.has(edge.from) && members.has(edge.to)));
+  for (const node of graph.nodes) Object.assign(node, state.positions[node.ticket.id]);
+  currentGraph = graph;
   if (!graph.nodes.length) {
     el('ticket-graph').innerHTML = `<div class="empty-state"><h3>${selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>Tickets will appear here when they are created.</p></div>`;
     return;
@@ -372,10 +389,8 @@ function renderGraph() {
   const byId = new Map(graph.nodes.map((node) => [node.ticket.id, node]));
   const edges = graph.edges.map((edge) => {
     const from = byId.get(edge.from); const to = byId.get(edge.to);
-    const x1 = from.x + 29; const x2 = to.x - 35;
-    const bend = Math.max(40, Math.abs(x2 - x1) / 2);
     const dimmed = !matchesFilters(from.ticket) || !matchesFilters(to.ticket);
-    return `<path class="graph-edge ${edge.satisfied ? 'resolved' : ''} ${from.problems.length || to.problems.length ? 'graph-error' : ''} ${dimmed ? 'graph-dimmed' : ''}" data-from="${escapeHTML(edge.from)}" data-to="${escapeHTML(edge.to)}" d="M ${x1} ${from.y} C ${x1 + bend} ${from.y}, ${x2 - bend} ${to.y}, ${x2} ${to.y}" marker-end="url(#graph-arrow)"/>`;
+    return `<path class="graph-edge ${edge.satisfied ? 'resolved' : ''} ${from.problems.length || to.problems.length ? 'graph-error' : ''} ${dimmed ? 'graph-dimmed' : ''}" data-from="${escapeHTML(edge.from)}" data-to="${escapeHTML(edge.to)}" d="${graphEdgePath(from, to)}" marker-end="url(#graph-arrow)"/>`;
   }).join('');
   const nodes = graph.nodes.map(({ ticket, primaryLabel, problems, external, x, y }) => {
     const description = `${String(ticket.number).padStart(2, '0')}: ${ticket.title}. ${ticket.displayState}. Labels: ${ticket.labels.join(', ') || 'None'}.${problems.length ? ` Validation errors: ${problems.join(' ')}` : ''}`;
@@ -389,7 +404,43 @@ function renderGraph() {
       ${problems.length ? '<g class="graph-warning" aria-hidden="true"><circle cx="23" cy="-23" r="9"/><text x="23" y="-20" text-anchor="middle">!</text></g>' : ''}
     </g>`;
   }).join('');
-  el('ticket-graph').innerHTML = `<p class="graph-legend" id="graph-legend">Blocker → dependent. Arrowhead only: external dependency. Border: label. Fill: state. !: validation error.</p><svg class="graph-canvas" viewBox="0 0 ${graph.width} ${graph.height}" role="group" aria-label="Ticket dependency graph" aria-describedby="graph-legend"><defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/></marker></defs>${edges}${nodes}</svg><p class="graph-tooltip" id="graph-tooltip" role="tooltip" hidden></p>`;
+  el('ticket-graph').innerHTML = `<div class="graph-tools" role="group" aria-label="Graph controls"><button type="button" class="refresh" data-graph-action="zoom-in" aria-label="Zoom in">+</button><button type="button" class="refresh" data-graph-action="zoom-out" aria-label="Zoom out">−</button><output id="graph-zoom" aria-label="Graph zoom"></output><button type="button" class="refresh" data-graph-action="fit">Fit graph</button><button type="button" class="refresh" data-graph-action="rearrange">Rearrange</button><button type="button" class="refresh" data-graph-action="isolate" ${!selectedTicket ? 'disabled' : ''}>Isolate component</button><button type="button" class="refresh" data-graph-action="all" ${!state.isolated ? 'disabled' : ''}>Show all</button></div><p class="graph-legend" id="graph-legend">Blocker → dependent. Arrowhead only: external dependency. Border: label. Fill: state. !: validation error. Drag nodes or the background. Focus a node and use arrow keys to move it.</p><svg class="graph-canvas" role="group" aria-label="Ticket dependency graph" aria-describedby="graph-legend"><defs><marker id="graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="context-stroke"/></marker></defs>${edges}${nodes}</svg><p class="graph-tooltip" id="graph-tooltip" role="tooltip" hidden></p>`;
+  updateGraphGeometry();
+}
+
+function graphEdgePath(from, to) {
+  const x1 = from.x + 29; const x2 = to.x - 35;
+  const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+  return `M ${x1} ${from.y} C ${x1 + bend} ${from.y}, ${x2 - bend} ${to.y}, ${x2} ${to.y}`;
+}
+function updateGraphGeometry() {
+  const state = graphWorkspaces[selectedFeature]; const svg = el('ticket-graph').querySelector('svg');
+  if (!svg || !currentGraph) return;
+  const byId = new Map(currentGraph.nodes.map((node) => { Object.assign(node, state.positions[node.ticket.id]); return [node.ticket.id, node]; }));
+  for (const node of svg.querySelectorAll('[data-ticket]')) {
+    const point = byId.get(node.dataset.ticket); node.setAttribute('transform', `translate(${point.x} ${point.y})`);
+  }
+  for (const edge of svg.querySelectorAll('[data-from]')) edge.setAttribute('d', graphEdgePath(byId.get(edge.dataset.from), byId.get(edge.dataset.to)));
+  svg.setAttribute('viewBox', `${state.view.x} ${state.view.y} ${state.width / state.view.zoom} ${state.height / state.view.zoom}`);
+  el('graph-zoom').textContent = `${Math.round(state.view.zoom * 100)}%`;
+}
+function fitGraph() {
+  const state = graphWorkspaces[selectedFeature];
+  if (!currentGraph?.nodes.length) return;
+  const xs = currentGraph.nodes.map((node) => node.x); const ys = currentGraph.nodes.map((node) => node.y);
+  const left = Math.min(...xs) - 60; const top = Math.min(...ys) - 60;
+  const width = Math.max(...xs) - left + 60; const height = Math.max(...ys) - top + 60;
+  const zoom = clamp(Math.min(state.width / width, state.height / height), .25, 4);
+  state.view = { zoom, x: left + width / 2 - state.width / zoom / 2, y: top + height / 2 - state.height / zoom / 2 };
+  updateGraphGeometry(); persistWorkspace();
+}
+function zoomGraph(factor, point) {
+  const state = graphWorkspaces[selectedFeature]; const old = state.view.zoom;
+  const anchor = point ?? { x: state.view.x + state.width / old / 2, y: state.view.y + state.height / old / 2 };
+  state.view.zoom = clamp(old * factor, .25, 4);
+  state.view.x = clamp(anchor.x - (anchor.x - state.view.x) * old / state.view.zoom, -state.width * 4, state.width * 4);
+  state.view.y = clamp(anchor.y - (anchor.y - state.view.y) * old / state.view.zoom, -state.height * 4, state.height * 4);
+  updateGraphGeometry(); persistWorkspace();
 }
 
 function render() {
@@ -409,6 +460,7 @@ function render() {
   const tickets = featureTickets.filter(matchesFilters);
   el('list-title').textContent = selectedFeature ?? 'Tickets';
   el('ticket-count').textContent = selectedFeature ? '' : tickets.length;
+  if (selectedFeature) (graphWorkspaces[selectedFeature] ??= {}).mode = ticketView;
   el('ticket-list').innerHTML = tickets.length ? `<table><thead><tr><th scope="col">Number</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Detail</th></tr></thead><tbody>${tickets.map((ticket) => `<tr data-ticket-row="${escapeHTML(ticket.id)}" class="${ticket.id === selectedTicket ? 'selected' : ''}"><td class="ticket-number">${String(ticket.number ?? '?').padStart(2, '0')}</td><td><button class="ticket-link" data-ticket="${escapeHTML(ticket.id)}">${escapeHTML(ticket.title || ticket.filename)}</button><div class="row-labels">${ticket.labels.map(labelChip).join('')}</div>${ticket.commits.length ? `<div class="row-commits">${commitChips(ticket)}</div>` : ''}</td><td>${stateChip(ticket.displayState)}${ticket.displayState === 'In progress' ? completionChip(ticket.progress.total ? Math.round(ticket.progress.checked / ticket.progress.total * 100) : 0) : ''}</td><td><span class="ticket-summary" title="${escapeHTML(summary(ticket))}">${escapeHTML(summary(ticket))}</span></td></tr>`).join('')}</tbody></table>` : `<div class="empty-state"><span class="empty-symbol" aria-hidden="true">◇</span><h3>${featureTickets.length ? 'No tickets match these filters' : selectedFeature ? 'No tickets in this feature' : 'No local tickets yet'}</h3><p>${featureTickets.length ? 'Change the selected labels or status, or clear the filters.' : selectedFeature ? 'Tickets will appear here when they are created.' : 'Create a feature and its tickets with to-tickets, then select Refresh.'}</p></div>`;
   el('ticket-list').hidden = ticketView === 'graph';
   el('ticket-graph').hidden = ticketView !== 'graph';
@@ -490,7 +542,7 @@ async function refresh() {
 el('features').addEventListener('click', (event) => {
   const button = event.target.closest('[data-feature]');
   if (!button) return;
-  recordCurrentScroll(); selectedFeature = button.dataset.feature; selectedTicket = null; mobileView = 'detail'; render(); el('detail').scrollTop = 0; writeRoute('push');
+  recordCurrentScroll(); selectedFeature = button.dataset.feature; selectedTicket = null; mobileView = 'detail'; ticketView = graphWorkspaces[selectedFeature]?.mode ?? ticketView; render(); el('detail').scrollTop = 0; writeRoute('push');
 });
 el('ticket-list').addEventListener('click', (event) => {
   const button = event.target.closest('[data-ticket]');
@@ -505,13 +557,58 @@ document.querySelector('.view-switch').addEventListener('click', (event) => {
   recordCurrentScroll(); ticketView = button.dataset.ticketView; render(); writeRoute('push');
 });
 function activateGraphNode(event) {
+  if (event.type === 'click' && suppressGraphClick) { suppressGraphClick = false; return; }
+  const action = event.target.closest('[data-graph-action]')?.dataset.graphAction;
+  if (action && event.type === 'click') {
+    const state = graphWorkspaces[selectedFeature];
+    if (action === 'zoom-in' || action === 'zoom-out') zoomGraph(action === 'zoom-in' ? 1.25 : .8);
+    if (action === 'fit') fitGraph();
+    if (action === 'rearrange') { state.positions = {}; state.view = {}; renderGraph(); fitGraph(); }
+    if (action === 'isolate' || action === 'all') { state.isolated = action === 'isolate' ? selectedTicket : null; renderGraph(); fitGraph(); }
+    if (['rearrange', 'isolate', 'all'].includes(action)) el('ticket-graph').querySelector(`[data-graph-action="${action === 'all' ? 'fit' : action}"]`)?.focus();
+    persistWorkspace(); return;
+  }
   const node = event.target.closest('[data-ticket]');
+  if (node && event.type === 'keydown' && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+    event.preventDefault(); const state = graphWorkspaces[selectedFeature]; const point = state.positions[node.dataset.ticket];
+    point.x = clamp(point.x + (event.key === 'ArrowLeft' ? -16 : event.key === 'ArrowRight' ? 16 : 0), 48, state.width - 48);
+    point.y = clamp(point.y + (event.key === 'ArrowUp' ? -16 : event.key === 'ArrowDown' ? 16 : 0), 48, state.height - 48);
+    updateGraphGeometry(); persistWorkspace(); return;
+  }
   if (!node || (event.type === 'keydown' && !['Enter', ' '].includes(event.key))) return;
   event.preventDefault(); navigateTicket(node.dataset.ticket);
   el('ticket-graph').querySelector(`[data-ticket="${CSS.escape(node.dataset.ticket)}"]`)?.focus({ preventScroll: true });
 }
 el('ticket-graph').addEventListener('click', activateGraphNode);
 el('ticket-graph').addEventListener('keydown', activateGraphNode);
+el('ticket-graph').addEventListener('pointerdown', (event) => {
+  const svg = event.target.closest('.graph-canvas');
+  if (!svg || event.button !== 0) return;
+  suppressGraphClick = false;
+  const id = event.target.closest('[data-ticket]')?.dataset.ticket;
+  const state = graphWorkspaces[selectedFeature]; const inverse = svg.getScreenCTM().inverse();
+  graphGesture = { id, inverse, start: new DOMPoint(event.clientX, event.clientY).matrixTransform(inverse), origin: { ...(id ? state.positions[id] : state.view) }, clientX: event.clientX, clientY: event.clientY, moved: false };
+  (event.target.closest('[data-ticket]') ?? svg).setPointerCapture(event.pointerId);
+});
+el('ticket-graph').addEventListener('pointermove', (event) => {
+  if (!graphGesture) return;
+  const gesture = graphGesture; const state = graphWorkspaces[selectedFeature];
+  if (Math.hypot(event.clientX - gesture.clientX, event.clientY - gesture.clientY) < 4 && !gesture.moved) return;
+  gesture.moved = true;
+  const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(gesture.inverse);
+  const dx = point.x - gesture.start.x; const dy = point.y - gesture.start.y;
+  if (gesture.id) state.positions[gesture.id] = { x: clamp(gesture.origin.x + dx, 48, state.width - 48), y: clamp(gesture.origin.y + dy, 48, state.height - 48) };
+  else { state.view.x = clamp(gesture.origin.x - dx, -state.width * 4, state.width * 4); state.view.y = clamp(gesture.origin.y - dy, -state.height * 4, state.height * 4); }
+  updateGraphGeometry();
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el('ticket-graph').addEventListener(type, () => {
+  if (!graphGesture) return;
+  suppressGraphClick = graphGesture.moved; graphGesture = null; persistWorkspace();
+});
+el('ticket-graph').addEventListener('wheel', (event) => {
+  const svg = event.target.closest('.graph-canvas'); if (!svg) return;
+  event.preventDefault(); zoomGraph(event.deltaY < 0 ? 1.1 : 1 / 1.1, new DOMPoint(event.clientX, event.clientY).matrixTransform(svg.getScreenCTM().inverse()));
+}, { passive: false });
 for (const type of ['pointerover', 'focusin']) el('ticket-graph').addEventListener(type, (event) => {
   const node = event.target.closest('[data-ticket]');
   const tooltip = el('graph-tooltip');

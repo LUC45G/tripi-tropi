@@ -46,3 +46,32 @@ export function projectGraph(tickets, feature) {
   });
   return { nodes, edges, width, height };
 }
+
+export function graphComponent(graph, root) {
+  const neighbors = new Map(graph.nodes.map((node) => [node.ticket.id, []]));
+  if (!neighbors.has(root)) return new Set();
+  for (const edge of graph.edges) {
+    neighbors.get(edge.from).push(edge.to); neighbors.get(edge.to).push(edge.from);
+  }
+  const members = new Set([root]);
+  for (const id of members) for (const neighbor of neighbors.get(id)) members.add(neighbor);
+  return members;
+}
+
+/** Restores only finite preferences and keeps existing nodes still across snapshots. */
+export function reconcileGraph(graph, saved = {}) {
+  const coordinate = (value) => Number.isFinite(value) && value >= 0 && value <= 1e6;
+  const positions = Object.fromEntries(graph.nodes.filter((node) => coordinate(saved?.positions?.[node.ticket.id]?.x) && coordinate(saved?.positions?.[node.ticket.id]?.y))
+    .map((node) => [node.ticket.id, { x: saved.positions[node.ticket.id].x, y: saved.positions[node.ticket.id].y }]));
+  for (const node of graph.nodes) {
+    if (positions[node.ticket.id]) continue;
+    const point = { x: node.x, y: node.y };
+    while (Object.values(positions).some((other) => Math.abs(other.x - point.x) < 70 && Math.abs(other.y - point.y) < 70)) point.y += 110;
+    positions[node.ticket.id] = point;
+  }
+  const width = Math.max(graph.width, coordinate(saved?.width) ? saved.width : 0, ...Object.values(positions).map((point) => point.x + 48));
+  const height = Math.max(graph.height, coordinate(saved?.height) ? saved.height : 0, ...Object.values(positions).map((point) => point.y + 48));
+  const zoom = Number.isFinite(saved?.view?.zoom) ? Math.min(4, Math.max(.25, saved.view.zoom)) : 1;
+  const offset = (value, size) => Number.isFinite(value) ? Math.min(size * 4, Math.max(-size * 4, value)) : 0;
+  return { positions, width, height, view: { x: offset(saved?.view?.x, width), y: offset(saved?.view?.y, height), zoom }, isolated: graph.nodes.some((node) => node.ticket.id === saved?.isolated) ? saved.isolated : null, mode: saved?.mode === 'list' ? 'list' : 'graph' };
+}

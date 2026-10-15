@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
-import { projectGraph } from '../skills/tripi-tropi/assets/graph.mjs';
+import { projectGraph, graphComponent, reconcileGraph } from '../skills/tripi-tropi/assets/graph.mjs';
 import { createViewer } from '../skills/tripi-tropi/scripts/server.mjs';
 
 const browserPath = process.env.TRIPI_TROPI_BROWSER ?? (process.platform === 'win32' ? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' : '');
@@ -99,6 +99,29 @@ async function fixture(t) {
   return { repo, put, readTree };
 }
 const stop = (viewer) => new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
+
+test('graph components include completed bridges and ignore external markers while updating connectivity', () => {
+  const tickets = [node(1, { displayState: 'Completed' }), node(2, { dependencies: [dependency(1)] }), node(3, { dependencies: [dependency(1, 'external')] })];
+  let graph = projectGraph(tickets, 'demo');
+  assert.deepEqual([...graphComponent(graph, tickets[1].id)].sort(), [tickets[0].id, tickets[1].id]);
+  assert.deepEqual([...graphComponent(graph, tickets[2].id)], [tickets[2].id]);
+  assert.equal(graphComponent(graph, 'deleted').size, 0);
+  tickets[2].dependencies.push(dependency(2)); graph = projectGraph(tickets, 'demo');
+  assert.equal(graphComponent(graph, tickets[0].id).size, 3);
+});
+
+test('graph preferences retain existing positions, place new nodes without overlap and discard invalid or deleted state', () => {
+  const graph = projectGraph([node(1), node(2)], 'demo');
+  const saved = { positions: { [node(1).id]: { x: 75, y: 182 }, deleted: { x: 20, y: 20 } }, view: { x: NaN, y: Infinity, zoom: 'bad' }, isolated: 'deleted' };
+  const state = reconcileGraph(graph, saved);
+  assert.deepEqual(state.positions[node(1).id], { x: 75, y: 182 });
+  assert.notDeepEqual(state.positions[node(2).id], state.positions[node(1).id]);
+  assert.equal(Object.hasOwn(state.positions, 'deleted'), false);
+  assert.deepEqual(state.view, { x: 0, y: 0, zoom: 1 }); assert.equal(state.isolated, null);
+  assert.deepEqual(reconcileGraph(graph, state), state);
+  assert.ok(Number.isFinite(reconcileGraph(graph, { positions: { [node(1).id]: { x: 1e300, y: -1 } } }).width));
+  assert.equal(reconcileGraph(graph, { isolated: node(1).id, view: { zoom: 90 } }).view.zoom, 4);
+});
 
 test('browser graph navigates tickets, retains filtered context and updates live with original files untouched', { skip: !browserPath || !existsSync(browserPath) }, async (t) => {
   const f = await fixture(t);
@@ -205,5 +228,100 @@ test('browser graph exposes cycles, invalid references and neutral labels within
     assert.equal(await graph.getByText('No tickets in this feature', { exact: true }).isVisible(), true);
     assert.equal(await graph.locator('.graph-node').count(), 0);
     assert.deepEqual(await f.readTree(), before);
+  } finally { await browser.close(); await stop(viewer); }
+});
+
+test('browser graph drags and pans without opening tickets, persists exploration and recalculates isolated components live', { skip: !browserPath || !existsSync(browserPath) }, async (t) => {
+  const f = await fixture(t);
+  const original = body('01', 'Bridge', { execution: 'completed' });
+  const firstFile = await f.put('demo', '01', original);
+  const secondBody = body('02', 'Dependent', { blockers: '01' });
+  const secondFile = await f.put('demo', '02', secondBody);
+  await f.put('demo', '03', body('03', 'Isolated'));
+  await f.put('other', '01', body('01', 'Other'));
+  const before = await f.readTree();
+  const viewer = await createViewer({ repo: f.repo }); const browser = await chromium.launch({ executablePath: browserPath, headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    await page.goto(`${viewer.url}/?feature=demo&tickets=graph`);
+    const graph = page.locator('#ticket-graph'); const first = graph.locator('[data-ticket="demo/01-task.md"]');
+    await first.waitFor(); const initial = await first.getAttribute('transform');
+    const edge = graph.locator('.graph-edge'); const initialEdge = await edge.getAttribute('d');
+    const box = await first.boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 55, box.y + box.height / 2 + 35, { steps: 6 }); await page.mouse.up();
+    assert.notEqual(await first.getAttribute('transform'), initial);
+    assert.notEqual(await edge.getAttribute('d'), initialEdge);
+    assert.equal(await page.locator('#detail-kind').textContent(), 'Feature overview');
+    await first.click(); assert.equal(await page.locator('#detail-kind').textContent(), 'Ticket 01');
+    await first.focus(); await page.keyboard.press('ArrowRight');
+    const moved = await first.getAttribute('transform');
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    assert.equal(await page.locator('#graph-zoom').textContent(), '125%');
+    const oldView = await graph.locator('svg').getAttribute('viewBox'); const canvas = await graph.locator('svg').boundingBox();
+    await page.mouse.move(canvas.x + 5, canvas.y + 5); await page.mouse.down();
+    await page.mouse.move(canvas.x + 30, canvas.y + 20, { steps: 5 }); await page.mouse.up();
+    assert.notEqual(await graph.locator('svg').getAttribute('viewBox'), oldView);
+    await page.getByRole('button', { name: 'Isolate component', exact: true }).click();
+    assert.equal(await graph.locator('.graph-node').count(), 2);
+    await page.locator('#status-summary').click(); await page.locator('[data-state="Completed"]').click();
+    assert.equal(await graph.locator('.graph-node').count(), 2);
+    assert.equal(await graph.locator('[data-ticket="demo/02-task.md"].graph-dimmed').count(), 1);
+    const isolatedView = await graph.locator('svg').getAttribute('viewBox');
+    await page.goto(viewer.url);
+    await first.waitFor();
+    assert.equal(await graph.isVisible(), true); assert.equal(await graph.locator('.graph-node').count(), 2);
+    assert.equal(await first.getAttribute('transform'), moved);
+    assert.equal(await graph.locator('svg').getAttribute('viewBox'), isolatedView);
+    await page.locator('[data-feature="other"]').click();
+    await page.getByRole('button', { name: 'List', exact: true }).click();
+    await page.locator('[data-feature="demo"]').click();
+    assert.equal(await graph.isVisible(), true); assert.equal(await first.getAttribute('transform'), moved);
+    await page.locator('[data-feature="other"]').click(); assert.equal(await graph.isVisible(), false);
+    await page.locator('[data-feature="demo"]').click();
+    const newFile = await f.put('demo', '04', body('04', 'New dependent', { blockers: '02' }));
+    await page.waitForFunction(() => document.querySelectorAll('#ticket-graph .graph-node').length === 3);
+    assert.equal(await first.getAttribute('transform'), moved);
+    await rm(secondFile);
+    await page.waitForFunction(() => document.querySelectorAll('#ticket-graph .graph-node').length === 1);
+    await rm(firstFile);
+    await page.waitForFunction(() => document.querySelector('#detail-kind').textContent === 'Feature overview' && document.querySelectorAll('#ticket-graph .graph-node').length === 2);
+    assert.equal(await page.getByRole('button', { name: 'Show all', exact: true }).isDisabled(), true);
+    await page.getByRole('button', { name: 'Rearrange', exact: true }).click();
+    await page.getByRole('button', { name: 'Fit graph', exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[data-mobile-view="list"]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await writeFile(firstFile, original); await writeFile(secondFile, secondBody); await rm(newFile);
+    assert.deepEqual(await f.readTree(), before);
+  } finally { await browser.close(); await stop(viewer); }
+});
+
+test('browser graph preferences are isolated by repository on the same origin and tolerate unusable storage', { skip: !browserPath || !existsSync(browserPath) }, async (t) => {
+  const a = await fixture(t); const b = await fixture(t);
+  await a.put('demo', '01', body('01', 'Project A')); await b.put('demo', '01', body('01', 'Project B'));
+  let viewer = await createViewer({ repo: a.repo }); const port = Number(new URL(viewer.url).port);
+  const browser = await chromium.launch({ executablePath: browserPath, headless: true });
+  try {
+    const page = await browser.newPage(); const target = '#ticket-graph [data-ticket="demo/01-task.md"]';
+    await page.goto(`${viewer.url}/?tickets=graph`); await page.locator(target).waitFor();
+    const initial = await page.locator(target).getAttribute('transform');
+    await page.locator(target).focus(); await page.keyboard.press('ArrowRight');
+    const moved = await page.locator(target).getAttribute('transform'); assert.notEqual(moved, initial);
+    await page.goto('about:blank'); await stop(viewer); viewer = await createViewer({ repo: b.repo, port });
+    await page.goto(`${viewer.url}/?tickets=graph`); await page.locator(target).waitFor();
+    assert.equal(await page.locator(target).getAttribute('transform'), initial);
+    await page.goto('about:blank'); await stop(viewer); viewer = await createViewer({ repo: a.repo, port });
+    await page.goto(viewer.url); await page.locator(target).waitFor();
+    assert.equal(await page.locator(target).getAttribute('transform'), moved);
+    const blocked = await browser.newPage(); const errors = []; blocked.on('pageerror', (error) => errors.push(error.message));
+    await blocked.addInitScript(() => {
+      Storage.prototype.getItem = () => '{invalid json';
+      Storage.prototype.setItem = () => { throw new Error('Storage disabled'); };
+    });
+    await blocked.goto(`${viewer.url}/?tickets=graph`); await blocked.locator(target).waitFor();
+    await blocked.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    assert.equal(await blocked.locator('#graph-zoom').textContent(), '125%');
+    assert.deepEqual(errors, []);
   } finally { await browser.close(); await stop(viewer); }
 });
