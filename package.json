@@ -1,6 +1,6 @@
 {
   "name": "@messieszurdo/tripi-tropi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" },
   "type": "module",
