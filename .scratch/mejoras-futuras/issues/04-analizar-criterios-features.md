@@ -1,5 +1,5 @@
 # 04: Definir cuándo crear una feature y cuándo reutilizar una existente
-Status: needs-triage
+Status: ready-for-agent
 Execution: pending
 Labels: research, planning
 Blocked by: none
@@ -28,8 +28,19 @@ La entrega es una guía de decisión propuesta con ejemplos y límites. No depen
 
 ## Trabajo realizado
 
-Pendiente de análisis y revisión.
+- Aclaración: criterios confirmados con el usuario; el análisis documental queda pendiente, sin reorganizar tickets ni modificar la guía vigente.
+
+### Decisiones confirmadas para el análisis
+
+- Una feature persigue un objetivo común: puede ser un módulo, una investigación, una funcionalidad u otro resultado definido. Si un ticket se desvía de ese objetivo, sugerir crear una nueva feature.
+- Una feature de módulo puede reunir varios objetivos específicos del mismo módulo bajo su objetivo común. Un único objetivo también puede atravesar varios módulos, sin crear una feature por cada módulo o capa técnica.
+- Puede tener un solo ticket; no dividir artificialmente el trabajo para justificar la agrupación.
+- Reutilizar una feature cuando el trabajo corrige o completa su objetivo, aunque sus tickets anteriores estén completados. Un objetivo independiente justifica proponer otra; no ampliar ni reabrir tickets completados para incorporar trabajo nuevo.
+- Antes de crearla, declarar principalmente objetivo y resultado esperado; precisar alcance y exclusiones de forma proporcional al trabajo. Elegir nombres descriptivos por objetivo, sin equiparar feature, rama Git, versión o sesión.
+- Si un cambio es suficientemente pequeño, no tiene dependencias y puede iniciarse y terminarse sin interferir con otros procedimientos, sugerir implementarlo directamente, sin crear ticket ni feature. Si hay dudas, aclararlas primero y volver a evaluar. No imponer límites arbitrarios de líneas o archivos ni interpretar la sugerencia como aprobación automática de ejecución.
+- Una auditoría solo justifica una feature si constituye una investigación con objetivo y resultado propios; agrupar correcciones por actividad o versión no basta. El usuario señaló `audit-013` como ejemplo de agrupación innecesaria; conservar su historial actual y usarla como caso del informe, sin reorganizarla.
+- Mantener tickets atómicos, con dependencias reales entre ellos o entre features; compartir módulo no obliga a agrupar objetivos independientes ni autoriza dependencias parciales.
 
 ## Estado posterior
 
-Pendiente.
+Criterios aclarados y aprobados para realizar el análisis documental; Execution permanece pending, con todos los criterios de aceptación pendientes de verificación.
