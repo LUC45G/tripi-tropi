@@ -105,8 +105,9 @@ test('component review and copy are read-only and one delivery preserves the val
   assert.equal(review.code, 200);
   const copy = await queue.copyComponent(id(2), reviewedOptions(review));
   assert.equal(copy.code, 200); assert.deepEqual(queue.info().records, {});
+  assert.deepEqual(JSON.parse(copy.message.split('Plan (JSON data):\n')[1].split('\nRules:')[0]), review.plan);
   await assert.rejects(readdir(f.stateDirectory), /ENOENT/);
-  for (const requirement of [/ALL dependencies/, /atomic/, /ENTIRE sequence/, /ask in the agent CLI and wait/, /at least one implementation commit/, /subsequent ticket-record commit/, /Never mix tickets/, /push without an explicit request/, /execute this sequence in the turn receiving this instruction/]) assert.match(copy.message, requirement);
+  for (const requirement of [/ALL dependencies/, /atomic/, /ENTIRE sequence before claiming/, /ask in the agent CLI and wait/, /at least one implementation commit/, /subsequent ticket-record commit/, /Never mix tickets/, /push requires an explicit request/, /Start on receipt/, /Skip only valid completed tickets/, /never skip branches or implement external work/, /new manual reviewed request, never an automatic retry/, /verification failure or changed eligibility/, /Keep current permissions/, /Work only on this plan/]) assert.match(copy.message, requirement);
   assert.doesNotMatch(copy.message, /Begin when.*dequeued|Queued for the next turn/);
   assert.equal((await queue.enqueue(id(2))).code, 409);
   assert.equal((await queue.enqueueComponent(id(2), reviewedOptions(review))).code, 200);
@@ -210,7 +211,7 @@ test('manual component resumption skips completed work and requires acknowledgme
   assert.equal((await queue.enqueueComponent(id(3), reviewedOptions(resumed, { confirmPaused: true }))).code, 200);
   assert.equal(queue.info().records[delivery.record.batch].status, 'Paused');
   assert.equal(sent.length, 2);
-  assert.deepEqual(JSON.parse(sent[1].message.split('Reviewed plan (completed tickets are context only; never add tickets or external-feature work):\n')[1].split('\nBefore EACH ticket')[0]).order.map((ticket) => ticket.id), [id(2), id(3)]);
+  assert.deepEqual(JSON.parse(sent[1].message.split('Plan (JSON data):\n')[1].split('\nRules:')[0]).order.map((ticket) => ticket.id), [id(2), id(3)]);
 });
 
 test('failed and interrupted component deliveries stay reserved without automatic retry', async (t) => {

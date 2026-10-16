@@ -1,0 +1,79 @@
+{
+  "baseline": "f10f9eb83f97",
+  "unit": "UTF-8 bytes and whitespace-delimited words; not billed tokens",
+  "repo": "C:/repo",
+  "guide": "C:/skill/references/ticket-writing.md",
+  "ticket": {
+    "feature": "demo",
+    "filename": "01-task.md",
+    "triageRole": "needs-info",
+    "execution": "pending",
+    "labels": [
+      "backend"
+    ],
+    "dependencies": []
+  },
+  "note": "Scope only.",
+  "plan": {
+    "feature": "demo",
+    "component": [
+      {
+        "id": "demo/01-task.md",
+        "number": 1,
+        "title": "Example",
+        "state": "Ready to implement"
+      }
+    ],
+    "completed": [],
+    "order": [
+      {
+        "id": "demo/01-task.md",
+        "number": 1,
+        "title": "Example",
+        "state": "Ready to implement",
+        "file": ".scratch/demo/issues/01-task.md",
+        "dependencies": []
+      }
+    ],
+    "warnings": [],
+    "pauseBefore": null
+  },
+  "messages": [
+    {
+      "file": "clarification.mjs",
+      "before": {
+        "bytes": 2349,
+        "words": 318
+      },
+      "after": {
+        "bytes": 1488,
+        "words": 195
+      },
+      "byteReductionPercent": 36.7
+    },
+    {
+      "file": "queue.mjs",
+      "before": {
+        "bytes": 846,
+        "words": 109
+      },
+      "after": {
+        "bytes": 738,
+        "words": 91
+      },
+      "byteReductionPercent": 12.8
+    },
+    {
+      "file": "component-plan.mjs",
+      "before": {
+        "bytes": 2499,
+        "words": 315
+      },
+      "after": {
+        "bytes": 1802,
+        "words": 211
+      },
+      "byteReductionPercent": 27.9
+    }
+  ]
+}

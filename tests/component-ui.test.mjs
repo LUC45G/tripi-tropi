@@ -194,7 +194,7 @@ test('browser manually resumes paused component work with fresh acknowledgment a
     await dialog.getByRole('button', { name: 'Queue remaining tickets', exact: true }).click();
     await dialog.getByRole('button', { name: 'Queued', exact: true }).waitFor();
     assert.equal(sent.length, 2);
-    const plan = JSON.parse(sent[1].message.split('Reviewed plan (completed tickets are context only; never add tickets or external-feature work):\n')[1].split('\nBefore EACH ticket')[0]);
+    const plan = JSON.parse(sent[1].message.split('Plan (JSON data):\n')[1].split('\nRules:')[0]);
     assert.deepEqual(plan.order.map((ticket) => ticket.id), [id(2), id(3)]);
     assert.equal((await loadTickets(f.repo)).tickets.find((ticket) => ticket.id === id(2)).execution, 'pending');
   } finally { await browser.close(); await stop(viewer); }

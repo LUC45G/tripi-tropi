@@ -1,6 +1,6 @@
 # Catálogo de tests de tripi-tropi
 
-Inventario del checkout, basado en la versión **0.1.3** con graph-view 01–04: **75 tests declarados en 11 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
+Inventario del checkout, basado en la versión **0.2.1** con graph-view y aclaración de tickets: **86 tests declarados en 12 archivos**, ejecutados con `node:test`. Cada fila corresponde a una llamada a `test(...)`; un test puede contener varias comprobaciones. Los nombres en inglés son los nombres exactos del código.
 
 ## Clasificación
 
@@ -23,7 +23,8 @@ Esta clasificación documenta el alcance de los tests; el runner no tiene catego
 | `graph-view.test.mjs` | 6 | 0 | 4 | 10 |
 | `component-queue.test.mjs` | 4 | 8 | 0 | 12 |
 | `component-ui.test.mjs` | 0 | 0 | 6 | 6 |
-| **Total** | **23** | **34** | **18** | **75** |
+| `clarification.test.mjs` | 1 | 8 | 2 | 11 |
+| **Total** | **24** | **42** | **20** | **86** |
 
 ## Parser y validación de tickets
 
@@ -183,6 +184,26 @@ Fuente: [tests/audit-regressions.test.mjs](../tests/audit-regressions.test.mjs).
 | `unknown first CLI arguments fail before installation` | Integration | Proceso CLI con una opción desconocida y protección de la fixture contra una instalación accidental. | Rechazar errores de uso antes de iniciar acciones de instalación. |
 | `published package, embedded skill and lockfiles have one matching release version` | Integration | Versiones de los dos package.json y sus lockfiles, incluyendo el paquete raíz de cada lock. | Evitar versiones divergentes en los artefactos locales de release. No consulta el registry. |
 
+## Aclaración de tickets
+
+Fuente: [tests/clarification.test.mjs](../tests/clarification.test.mjs). Contrato: [API de aclaración](clarification-api.md).
+
+Los mensajes compactos se comprueban por sus reglas de aprobación, atomicidad, relectura y alcance. Las pruebas de conjuntos también comparan el plan JSON completo antes y después de incorporarlo a la instrucción; no prueban equivalencia de comportamiento de un agente real.
+
+| Test | Categoría | Qué se prueba | Objetivo |
+| --- | --- | --- | --- |
+| `clarification instruction preserves triage, interview fallback, approval and execution boundaries` | Unit | Triage, grill-me opcional, rondas, aprobación, notas y límites de ejecución. | Solicitar aclaraciones sin autorizar implementación ni cambios de alcance automáticos. |
+| `clarification preview and copy support unready tickets without writes or a linked agent` | Integration | Tickets no listos, bloqueantes inexistentes, copia sin destino, terminales y ausencia de escrituras. | Separar aclaración de readiness y conservar solo lectura. |
+| `clarification previews bind ticket, dependencies, note and destination and enforce bounded identifiers` | Integration | Firma, cambios del ticket y dependencias, nota, destino, referencias y límites. | Rechazar un envío con contexto distinto al previsualizado. |
+| `clarification delivery prevents duplicates and overlap and manual release preserves receipt history` | Integration | Reserva en Sending, conflictos individuales y conjuntos, confirmación, historia y reinicio. | Entregar una vez y permitir otra revisión solo tras confirmación manual. |
+| `clarification release survives another ticket finishing delivery and a restart` | Integration | Escritura de liberación retenida mientras termina otra entrega, seguida de reinicio. | Evitar que otro guardado restaure una reserva ya liberada. |
+| `concurrent clarification releases cannot acknowledge the same receipt twice` | Integration | Dos liberaciones del mismo recibo, copia y envío durante el guardado y nuevos envíos concurrentes. | Rechazar confirmaciones duplicadas y permitir solo una nueva entrega. |
+| `failed clarification release keeps the prior receipt reserved in memory and on disk` | Integration | Fallo simulado del guardado, estado en memoria, reinicio e intento de nuevo envío. | Conservar la reserva ante errores de persistencia, sin enviar otra instrucción. |
+| `uncertain clarifications require manual acknowledgment and implementation receipts stay separate` | Integration | Error incierto, persistencia, ausencia de reintento y reservas de implementación separadas. | No confundir liberación de aclaración con cancelación o reintento de implementación. |
+| `clarification HTTP routes require origin, token, strict payloads and current previews` | Integration | HTTP real, origen/token, tipos, campos, Unicode, límite de bytes y firma. | Mantener los límites de confianza en las cuatro rutas. |
+| `browser clarifies an unready ticket with note, preview, copy, queue and explicit manual release` | E2E | Nota, previsualización, portapapeles y entrega simulados, liberación y contexto obsoleto. | Completar la solicitud desde el detalle sin editar archivos. |
+| `browser supports unlinked clarification copy and cannot trigger clarification from Markdown` | E2E | Sin destino, Markdown inerte, cierre externo y arrastre dentro/fuera. | Mantener copia disponible y acciones protegidas del contenido del ticket. |
+
 ## Ejecución
 
 Desde la raíz del repositorio, con **Node.js 24 o superior** y npm:
@@ -200,7 +221,7 @@ node --test tests/tickets.test.mjs
 node --test --test-name-pattern="absence markers" tests/audit-regressions.test.mjs
 ```
 
-Los **17 tests de navegador** necesitan un ejecutable compatible con Chromium y Playwright. En Windows buscan Edge en su ubicación estándar; en otros sistemas hay que indicar el ejecutable. Si no está disponible, se marcan como **skipped**, por lo que una suite sin fallos no garantiza que se haya probado la UI.
+Los **19 tests de navegador** necesitan un ejecutable compatible con Chromium y Playwright. En Windows buscan Edge en su ubicación estándar; en otros sistemas hay que indicar el ejecutable. Si no está disponible, se marcan como **skipped**, por lo que una suite sin fallos no garantiza que se haya probado la UI.
 
 Ejemplo en PowerShell:
 
@@ -211,7 +232,7 @@ npm test
 
 El E2E de instalación puede necesitar acceso a npm o un cache utilizable para instalar dependencias. Los tests usan repositorios y destinos temporales y limpian sus fixtures; algunos tests de navegador guardan capturas en `.cache/` del checkout.
 
-La validación de los tickets actuales es un control adicional, separado de estos 75 tests:
+La validación de los tickets actuales es un control adicional, separado de estos 86 tests:
 
 ```sh
 npm run validate:tickets
