@@ -27,4 +27,6 @@ The existing external per-repository/session ledger uses separate `@clarify:<tic
 
 Manual release requires confirmation that the prior review ended and refuses an active Sending receipt. It persists Released before permitting another send and retains the released receipt as history when another attempt starts. It never removes implementation reservations. An uncertain delivery still needs checking in the agent CLI before acknowledgment. Copying or using another destination cannot be protected as if the viewer had delivered that work.
 
+While a release is being saved, another release, copy or delivery for that ticket is refused. Ledger writes serialize current receipts so another ticket finishing delivery cannot undo the acknowledgment. A failed release returns 502 and keeps the prior reservation; it does not deliver anything.
+
 The viewer cannot detect conversation completion. The user can confirm incorrectly and allow overlapping work; the UI explains that release does not cancel the agent. Automated tests simulate delivery and the clipboard; they do not prove that a real agent asks questions or waits for approval correctly.

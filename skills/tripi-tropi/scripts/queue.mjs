@@ -86,8 +86,9 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
   }
   let records = await readRecords(thread);
   let writes = Promise.resolve();
+  const releasingClarifications = new Set();
   const clarificationKey = (id) => `@clarify:${id}`;
-  const hasClarification = (id) => records[clarificationKey(id)] && records[clarificationKey(id)].status !== 'Released';
+  const hasClarification = (id) => releasingClarifications.has(id) || records[clarificationKey(id)] && records[clarificationKey(id)].status !== 'Released';
   async function prepareMessage(id) {
     if (typeof id !== 'string' || id.length > 1000) return { code: 400, error: 'A ticket identifier is required.' };
     const data = await loadTickets(repo, { strict: true });
@@ -106,11 +107,12 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
     }
     return { code: 200, message: implementationMessage(repo, ticket) };
   }
-  function persist(value = JSON.stringify(records)) {
+  function persist() {
     const next = writes.then(async () => {
       await mkdir(stateDirectory, { recursive: true });
       const ledger = ledgerFor(thread);
-      await writeFile(`${ledger}.tmp`, value, { mode: 0o600 }); await rename(`${ledger}.tmp`, ledger);
+      // Snapshot when this write runs so concurrent transitions cannot restore stale receipts.
+      await writeFile(`${ledger}.tmp`, JSON.stringify(records), { mode: 0o600 }); await rename(`${ledger}.tmp`, ledger);
     });
     writes = next.catch(() => {}); return next;
   }
@@ -231,11 +233,17 @@ export async function createQueue({ repo, thread = '', deliver = queueMessage, s
         const review = await prepareClarification(id, options);
         if (review.code !== 200) return review;
         const key = clarificationKey(id); const record = records[key];
-        if (!record || record.status === 'Released' || record.status === 'Sending' || record !== review.record) return { code: 409, error: 'This clarification cannot be released now. Refresh its delivery status.' };
-        const released = { ...record, status: 'Released', acknowledgedAt: new Date().toISOString() };
-        await persist(JSON.stringify({ ...records, [key]: released }));
-        records[key] = released;
-        return { code: 200, record: records[key] };
+        if (!record || record.status === 'Released' || record.status === 'Sending' || releasingClarifications.has(id) || record !== review.record) return { code: 409, error: 'This clarification cannot be released now. Refresh its delivery status.' };
+        releasingClarifications.add(id);
+        records[key] = { ...record, status: 'Released', acknowledgedAt: new Date().toISOString() };
+        try {
+          await persist();
+          return { code: 200, record: records[key] };
+        } catch (error) {
+          records[key] = record;
+          await persist().catch(() => {});
+          return { code: 502, error: `Clarification release could not be saved: ${error.message}. The request remains reserved.`, record };
+        } finally { releasingClarifications.delete(id); }
       } finally { activeSends--; }
     },
     async reviewComponent(id) { return reviewComponent(id); },

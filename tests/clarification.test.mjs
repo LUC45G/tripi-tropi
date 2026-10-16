@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, promises as fs } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
@@ -42,6 +43,23 @@ async function fixture(t) {
 }
 const reviewed = (review, note = '') => ({ reviewToken: review.reviewToken, note });
 const stop = (viewer) => new Promise((resolve) => { viewer.server.close(resolve); viewer.server.closeAllConnections(); });
+
+function holdLedgerWrite(t, directory, matches) {
+  const original = fs.rename;
+  let release; const waiting = new Promise((resolve) => { release = resolve; });
+  let arrive; const started = new Promise((resolve) => { arrive = resolve; });
+  let held = false;
+  // Pause the real atomic write to reproduce overlapping requests deterministically.
+  fs.rename = async (source, destination) => {
+    if (!held && path.dirname(source) === directory && matches(JSON.parse(await readFile(source, 'utf8')))) {
+      held = true; arrive(); await waiting;
+    }
+    return original(source, destination);
+  };
+  syncBuiltinESMExports();
+  t.after(() => { release(); fs.rename = original; syncBuiltinESMExports(); });
+  return { started, release };
+}
 
 test('clarification instruction preserves triage, interview fallback, approval and execution boundaries', () => {
   const ticket = { feature: 'demo', filename: '01-task.md', triageRole: 'needs-info', execution: 'pending', labels: ['backend'] };
@@ -101,6 +119,77 @@ test('clarification delivery prevents duplicates and overlap and manual release 
     assert.equal((await restarted.enqueueClarification(id, reviewed(current))).code, 409);
     await f.put(); assert.equal(await readFile(f.file, 'utf8'), before);
   } finally { release(); await sending; }
+});
+
+test('clarification release survives another ticket finishing delivery and a restart', async (t) => {
+  const f = await fixture(t);
+  const other = 'demo/02-task.md'; const otherKey = `@clarify:${other}`;
+  await writeFile(path.join(path.dirname(f.file), '02-task.md'), body().replace('# 01:', '# 02:'));
+  let finish; const waiting = new Promise((resolve) => { finish = resolve; });
+  let arrive; const started = new Promise((resolve) => { arrive = resolve; });
+  const queue = await createQueue({ ...f, thread, deliver: async ({ message }) => {
+    if (message.includes('02-task.md')) { arrive(); await waiting; }
+  } });
+  assert.equal((await queue.enqueueClarification(id, reviewed(await queue.reviewClarification(id)))).code, 200);
+  const sending = queue.enqueueClarification(other, reviewed(await queue.reviewClarification(other)));
+  await started;
+  const gate = holdLedgerWrite(t, f.stateDirectory, (saved) => saved[key]?.status === 'Released' && saved[otherKey]?.status === 'Sending');
+  const releasing = queue.releaseClarification(id, { ...reviewed(await queue.reviewClarification(id)), confirmEnded: true });
+  try {
+    await gate.started;
+    finish();
+    // Delivery completion runs synchronously before its queued save waits on the held write.
+    await new Promise(setImmediate);
+    assert.equal(queue.info().records[otherKey].status, 'Queued');
+    gate.release();
+    assert.equal((await releasing).code, 200); assert.equal((await sending).code, 200);
+    const restarted = await createQueue({ ...f, thread });
+    assert.equal(restarted.info().records[key].status, 'Released');
+    assert.equal(restarted.info().records[otherKey].status, 'Queued');
+  } finally { finish(); gate.release(); await Promise.allSettled([releasing, sending]); }
+});
+
+test('concurrent clarification releases cannot acknowledge the same receipt twice', async (t) => {
+  const f = await fixture(t); let sends = 0;
+  const queue = await createQueue({ ...f, thread, deliver: async () => { sends++; } });
+  assert.equal((await queue.enqueueClarification(id, reviewed(await queue.reviewClarification(id)))).code, 200);
+  const options = { ...reviewed(await queue.reviewClarification(id)), confirmEnded: true };
+  const gate = holdLedgerWrite(t, f.stateDirectory, (saved) => saved[key]?.status === 'Released');
+  const first = queue.releaseClarification(id, options); let second;
+  try {
+    await gate.started;
+    const current = reviewed(await queue.reviewClarification(id));
+    assert.equal((await queue.enqueueClarification(id, current)).code, 409);
+    assert.equal((await queue.copyClarification(id, current)).code, 409);
+    second = queue.releaseClarification(id, options);
+    let timer;
+    try {
+      assert.equal(await Promise.race([second.then((result) => result.code), new Promise((resolve) => { timer = setTimeout(() => resolve('still waiting on persistence'), 2000); })]), 409);
+    } finally { clearTimeout(timer); }
+    gate.release(); assert.equal((await first).code, 200);
+    const next = reviewed(await queue.reviewClarification(id));
+    const results = await Promise.all([queue.enqueueClarification(id, next), queue.enqueueClarification(id, next)]);
+    assert.deepEqual(results.map((result) => result.code).sort(), [200, 409]); assert.equal(sends, 2);
+  } finally { gate.release(); await Promise.allSettled([first, second]); }
+});
+
+test('failed clarification release keeps the prior receipt reserved in memory and on disk', async (t) => {
+  const f = await fixture(t); let sends = 0;
+  const queue = await createQueue({ ...f, thread, deliver: async () => { sends++; } });
+  assert.equal((await queue.enqueueClarification(id, reviewed(await queue.reviewClarification(id)))).code, 200);
+  const original = fs.rename;
+  fs.rename = async (source, destination) => {
+    if (path.dirname(source) === f.stateDirectory && JSON.parse(await readFile(source, 'utf8'))[key]?.status === 'Released') throw new Error('Simulated disk failure');
+    return original(source, destination);
+  };
+  syncBuiltinESMExports();
+  t.after(() => { fs.rename = original; syncBuiltinESMExports(); });
+  const result = await queue.releaseClarification(id, { ...reviewed(await queue.reviewClarification(id)), confirmEnded: true });
+  assert.equal(result.code, 502); assert.match(result.error, /Simulated disk failure/);
+  assert.equal(queue.info().records[key].status, 'Queued');
+  assert.equal((await queue.enqueueClarification(id, reviewed(await queue.reviewClarification(id)))).code, 409);
+  const restarted = await createQueue({ ...f, thread });
+  assert.equal(restarted.info().records[key].status, 'Queued'); assert.equal(sends, 1);
 });
 
 test('uncertain clarifications require manual acknowledgment and implementation receipts stay separate', async (t) => {
